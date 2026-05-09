@@ -1,5 +1,7 @@
 import { Controller, Get, Header } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 
+@ApiExcludeController()
 @Controller()
 export class AppController {
   /** Evita pantalla en blanco al abrir http://localhost:3000/ en el navegador (solo API). */
@@ -38,6 +40,7 @@ export class AppController {
     <li><a href="/catalogo/tipos-via"><code>/catalogo/tipos-via</code></a></li>
   </ul>
   <p>Servidor en puerto <code>${port}</code>.</p>
+  <p>Documentación OpenAPI: <a href="/docs"><code>/docs</code></a> · <a href="/docs/json"><code>/docs/json</code></a></p>
 </body>
 </html>`;
   }

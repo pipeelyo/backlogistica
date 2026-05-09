@@ -1,7 +1,10 @@
 import { Controller, Get, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { ApiHeader, ApiOkResponse, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { CheckHealthUseCase } from '../../application/check-health.use-case';
+import { HealthJsonSchema } from '../../../../swagger/schemas/health.schema';
 
+@ApiTags('Salud')
 @Controller('health')
 export class HealthController {
   constructor(private readonly checkHealth: CheckHealthUseCase) {}
@@ -11,6 +14,22 @@ export class HealthController {
    * Si el cliente no pide JSON explícito, devolvemos HTML legible; si no, el objeto (JSON).
    */
   @Get()
+  @ApiOperation({
+    summary: 'Estado del servicio',
+    description:
+      'Con cabecera `Accept: application/json` (o cliente tipo curl) responde JSON. ' +
+      'En navegador típico responde HTML legible.',
+  })
+  @ApiProduces('application/json', 'text/html')
+  @ApiHeader({
+    name: 'Accept',
+    required: false,
+    description: 'Usar `application/json` para forzar JSON',
+  })
+  @ApiOkResponse({
+    description: 'Cuerpo según negociación (JSON o HTML)',
+    type: HealthJsonSchema,
+  })
   getHealth(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const data = this.checkHealth.execute();
     const ua = (req.get('user-agent') ?? '').toLowerCase();
@@ -44,7 +63,7 @@ export class HealthController {
   <p>Estado: <strong>${data.status}</strong></p>
   <p>Marca de tiempo: <code>${data.timestamp}</code></p>
   <p>Para JSON (API): envía la cabecera <code>Accept: application/json</code> o usa <code>curl</code>.</p>
-  <p><a href="/">Volver al inicio</a></p>
+  <p><a href="/">Volver al inicio</a> · <a href="/docs">Swagger</a></p>
 </body>
 </html>`;
   }
