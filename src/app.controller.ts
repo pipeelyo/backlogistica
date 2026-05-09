@@ -28,7 +28,7 @@ export class AppController {
   <p>Esta app es una <strong>API REST</strong>, no una web con interfaz. Usa estas rutas:</p>
   <ul>
     <li><a href="/health"><code>/health</code></a> — estado (HTML en navegador; JSON con <code>Accept: application/json</code> o <code>curl</code>)</li>
-    <li><a href="/pedidos"><code>/pedidos</code></a> — listado de pedidos</li>
+    <li><a href="/pedidos"><code>/pedidos</code></a> — listado; filtro por día UTC: <code>?fecha=YYYY-MM-DD</code></li>
     <li><a href="/catalogo/paises"><code>/catalogo/paises</code></a></li>
     <li><a href="/catalogo/departamentos"><code>/catalogo/departamentos</code></a></li>
     <li><a href="/catalogo/ciudades"><code>/catalogo/ciudades</code></a></li>

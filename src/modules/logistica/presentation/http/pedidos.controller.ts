@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import {
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -9,6 +9,7 @@ import {
 import { GetPedidoByIdUseCase } from '../../application/get-pedido-by-id.use-case';
 import { ListPedidosUseCase } from '../../application/list-pedidos.use-case';
 import { PedidoListadoSchema } from '../../../../swagger/schemas/pedido-listado.schema';
+import { ListPedidosQueryDto } from './dto/list-pedidos.query.dto';
 
 @ApiTags('Pedidos')
 @Controller('pedidos')
@@ -22,11 +23,12 @@ export class PedidosController {
   @ApiOperation({
     summary: 'Listar pedidos',
     description:
-      'Devuelve pedidos con tipo, estado, método, usuarios, paquete y dirección **solo como nombres** (texto), no objetos completos.',
+      'Devuelve pedidos con tipo, estado, método, usuarios, paquete y dirección **solo como nombres** (texto). ' +
+      'Opcional: `?fecha=YYYY-MM-DD` filtra por día de `creado_en` en **UTC**.',
   })
   @ApiOkResponse({ type: PedidoListadoSchema, isArray: true })
-  list() {
-    return this.listPedidos.execute();
+  list(@Query() query: ListPedidosQueryDto) {
+    return this.listPedidos.execute(query.fecha ? { fecha: query.fecha } : undefined);
   }
 
   @Get(':id')

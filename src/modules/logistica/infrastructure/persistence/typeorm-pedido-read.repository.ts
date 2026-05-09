@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import type { PedidoListado } from '../../domain/read-models/pedido-listado';
+import type { ListPedidosFilter } from '../../domain/ports/pedido-read.port';
 import { PedidoReadPort } from '../../domain/ports/pedido-read.port';
 import { DireccionOrmEntity } from './direccion.orm-entity';
 import { PedidoOrmEntity } from './pedido.orm-entity';
@@ -48,6 +49,13 @@ function toListado(row: PedidoOrmEntity): PedidoListado {
   };
 }
 
+/** Inicio y fin (inclusive) del día `YYYY-MM-DD` en UTC para `Between` en `timestamptz`. */
+function rangoDiaUtc(fechaYmd: string): { desde: Date; hasta: Date } {
+  const desde = new Date(`${fechaYmd}T00:00:00.000Z`);
+  const hasta = new Date(`${fechaYmd}T23:59:59.999Z`);
+  return { desde, hasta };
+}
+
 @Injectable()
 export class TypeOrmPedidoReadRepository implements PedidoReadPort {
   constructor(
@@ -55,11 +63,22 @@ export class TypeOrmPedidoReadRepository implements PedidoReadPort {
     private readonly repo: Repository<PedidoOrmEntity>,
   ) {}
 
-  async listPedidos(): Promise<PedidoListado[]> {
-    const rows = await this.repo.find({
+  async listPedidos(filter?: ListPedidosFilter): Promise<PedidoListado[]> {
+    const base = {
       relations: [...PEDIDO_RELATIONS],
-      order: { creadoEn: 'DESC' },
-    });
+      order: { creadoEn: 'DESC' as const },
+    };
+
+    if (filter?.fecha) {
+      const { desde, hasta } = rangoDiaUtc(filter.fecha);
+      const rows = await this.repo.find({
+        ...base,
+        where: { creadoEn: Between(desde, hasta) },
+      });
+      return rows.map(toListado);
+    }
+
+    const rows = await this.repo.find(base);
     return rows.map(toListado);
   }
 
