@@ -18,16 +18,36 @@ const logger = new Logger('DatabaseModule');
         }
 
         try {
-          const parsed = new URL(url.replace(/^postgres:\/\//i, 'postgresql://'));
+          const normalized = url.replace(/^postgres:\/\//i, 'postgresql://');
+          const parsed = new URL(normalized);
           const host = parsed.hostname;
-          if (host.startsWith('db.') && host.endsWith('.supabase.co')) {
-            logger.warn(
-              'DATABASE_URL usa el host directo db.*.supabase.co (suele ser solo IPv6). ' +
-                'Si ves ENOTFOUND o no conecta, cambia a la URI del pooler en Supabase → Connect (Session o Transaction, host …pooler.supabase.com).',
+          const useDirect =
+            config.get<string>('DATABASE_USE_DIRECT_HOST', 'false').toLowerCase() === 'true';
+
+          if (host.startsWith('db.') && host.endsWith('.supabase.co') && !useDirect) {
+            throw new Error(
+              [
+                'DATABASE_URL apunta al host directo de Supabase (db.*.supabase.co).',
+                'En muchas redes solo hay IPv4 y ese nombre no resuelve → getaddrinfo ENOTFOUND.',
+                '',
+                'Solución: en el dashboard → Connect → Postgres → elige Session pooler o Transaction pooler,',
+                'copia la URI (host …pooler.supabase.com, no db.…). Sustituye DATABASE_URL en tu .env.',
+                '',
+                'Si de verdad tienes IPv6 y quieres forzar el host directo, añade DATABASE_USE_DIRECT_HOST=true',
+              ].join('\n'),
             );
           }
-        } catch {
-          // URL no parseable; TypeORM seguirá intentando con la cadena tal cual
+
+          if (host.startsWith('db.') && host.endsWith('.supabase.co') && useDirect) {
+            logger.warn(
+              'DATABASE_USE_DIRECT_HOST=true: usando host db.*.supabase.co (requiere IPv6 o red compatible).',
+            );
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith('DATABASE_URL apunta')) {
+            throw e;
+          }
+          // URL no parseable; TypeORM seguirá con la cadena tal cual
         }
 
         const synchronize = config.get<string>('TYPEORM_SYNC', 'false') === 'true';
