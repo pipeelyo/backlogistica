@@ -1,9 +1,10 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { TipoDocumentoOrmEntity } from './tipo-documento.orm-entity';
 
 @Entity({ name: 'usuarios' })
 export class UsuarioOrmEntity {
-  @PrimaryColumn({ name: 'id_usuario', type: 'integer' })
-  idUsuario!: number;
+  @PrimaryColumn({ name: 'id_usuario', type: 'uuid' })
+  idUsuario!: string;
 
   @Column({ type: 'varchar', length: 120 })
   nombres!: string;
@@ -11,8 +12,9 @@ export class UsuarioOrmEntity {
   @Column({ type: 'varchar', length: 120 })
   apellidos!: string;
 
-  @Column({ name: 'fk_tipo_documento', type: 'integer' })
-  fkTipoDocumento!: number;
+  @ManyToOne(() => TipoDocumentoOrmEntity, { nullable: false })
+  @JoinColumn({ name: 'fk_tipo_documento' })
+  tipoDocumento!: TipoDocumentoOrmEntity;
 
   @Column({ type: 'varchar', length: 32 })
   documento!: string;

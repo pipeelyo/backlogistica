@@ -1,6 +1,6 @@
-import { Pedido } from '../entities/pedido.entity';
+import type { PedidoListado } from '../read-models/pedido-listado';
 
 export interface PedidoReadPort {
-  listPedidos(): Promise<Pedido[]>;
-  findPedidoById(id: number): Promise<Pedido | null>;
+  listPedidos(): Promise<PedidoListado[]>;
+  findPedidoById(id: string): Promise<PedidoListado | null>;
 }

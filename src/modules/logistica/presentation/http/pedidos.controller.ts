@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
 import { GetPedidoByIdUseCase } from '../../application/get-pedido-by-id.use-case';
 import { ListPedidosUseCase } from '../../application/list-pedidos.use-case';
 
@@ -15,7 +15,7 @@ export class PedidosController {
   }
 
   @Get(':id')
-  getOne(@Param('id', ParseIntPipe) id: number) {
+  getOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.getPedidoById.execute(id);
   }
 }

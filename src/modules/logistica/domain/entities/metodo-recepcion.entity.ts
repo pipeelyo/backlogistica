@@ -1,6 +1,6 @@
 export class MetodoRecepcion {
   constructor(
-    public readonly idMetodoRecepcion: number,
+    public readonly idMetodoRecepcion: string,
     public readonly nombre: string,
   ) {}
 }

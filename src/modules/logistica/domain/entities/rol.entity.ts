@@ -1,6 +1,6 @@
 export class Rol {
   constructor(
-    public readonly idRol: number,
+    public readonly idRol: string,
     public readonly nombre: string,
   ) {}
 }

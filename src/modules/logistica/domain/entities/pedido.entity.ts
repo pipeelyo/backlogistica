@@ -1,16 +1,16 @@
-/** Agregado principal de la logística: pedido y sus referencias por ID (sin acoplar a persistencia). */
+/** Agregado de dominio con referencias UUID (alineado a Supabase). */
 export class Pedido {
   constructor(
-    public readonly idPedido: number,
+    public readonly idPedido: string,
     public readonly numGuia: string,
-    public readonly fkTipoPedido: number,
-    public readonly fkUsuarioSolicitud: number,
-    public readonly fkUsuarioRecolector: number | null,
-    public readonly fkUsuarioRepartidor: number | null,
-    public readonly fkMetodoRecepcion: number,
-    public readonly fkPaquete: number,
-    public readonly fkDireccion: number,
-    public readonly fkEstadoPedido: number,
+    public readonly fkTipoPedido: string,
+    public readonly fkUsuarioSolicitud: string,
+    public readonly fkUsuarioRecolector: string | null,
+    public readonly fkUsuarioRepartidor: string | null,
+    public readonly fkMetodoRecepcion: string,
+    public readonly fkPaquete: string,
+    public readonly fkDireccion: string,
+    public readonly fkEstadoPedido: string,
     public readonly creadoEn: Date,
   ) {}
 }

@@ -1,36 +1,50 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { DireccionOrmEntity } from './direccion.orm-entity';
+import { EstadoPedidoOrmEntity } from './estado-pedido.orm-entity';
+import { MetodoRecepcionOrmEntity } from './metodo-recepcion.orm-entity';
+import { PaqueteOrmEntity } from './paquete.orm-entity';
+import { TipoPedidoOrmEntity } from './tipo-pedido.orm-entity';
+import { UsuarioOrmEntity } from './usuario.orm-entity';
 
 @Entity({ name: 'pedidos' })
 export class PedidoOrmEntity {
-  @PrimaryColumn({ name: 'id_pedido', type: 'integer' })
-  idPedido!: number;
+  @PrimaryColumn({ name: 'id_pedido', type: 'uuid' })
+  idPedido!: string;
 
   @Column({ name: 'num_guia', type: 'varchar', length: 64 })
   numGuia!: string;
 
-  @Column({ name: 'fk_tipo_pedido', type: 'integer' })
-  fkTipoPedido!: number;
+  @ManyToOne(() => TipoPedidoOrmEntity, { nullable: false })
+  @JoinColumn({ name: 'fk_tipo_pedido' })
+  tipoPedido!: TipoPedidoOrmEntity;
 
-  @Column({ name: 'fk_usuario_solicitud', type: 'integer' })
-  fkUsuarioSolicitud!: number;
+  @ManyToOne(() => UsuarioOrmEntity, { nullable: false })
+  @JoinColumn({ name: 'fk_usuario_solicitud' })
+  usuarioSolicitud!: UsuarioOrmEntity;
 
-  @Column({ name: 'fk_usuario_recolector', type: 'integer', nullable: true })
-  fkUsuarioRecolector!: number | null;
+  @ManyToOne(() => UsuarioOrmEntity, { nullable: true })
+  @JoinColumn({ name: 'fk_usuario_recolector' })
+  usuarioRecolector!: UsuarioOrmEntity | null;
 
-  @Column({ name: 'fk_usuario_repartidor', type: 'integer', nullable: true })
-  fkUsuarioRepartidor!: number | null;
+  @ManyToOne(() => UsuarioOrmEntity, { nullable: true })
+  @JoinColumn({ name: 'fk_usuario_repartidor' })
+  usuarioRepartidor!: UsuarioOrmEntity | null;
 
-  @Column({ name: 'fk_metodo_recepcion', type: 'integer' })
-  fkMetodoRecepcion!: number;
+  @ManyToOne(() => MetodoRecepcionOrmEntity, { nullable: false })
+  @JoinColumn({ name: 'fk_metodo_recepcion' })
+  metodoRecepcion!: MetodoRecepcionOrmEntity;
 
-  @Column({ name: 'fk_paquete', type: 'integer' })
-  fkPaquete!: number;
+  @ManyToOne(() => PaqueteOrmEntity, { nullable: false })
+  @JoinColumn({ name: 'fk_paquete' })
+  paquete!: PaqueteOrmEntity;
 
-  @Column({ name: 'fk_direccion', type: 'integer' })
-  fkDireccion!: number;
+  @ManyToOne(() => DireccionOrmEntity, { nullable: false })
+  @JoinColumn({ name: 'fk_direccion' })
+  direccion!: DireccionOrmEntity;
 
-  @Column({ name: 'fk_estado_pedido', type: 'integer' })
-  fkEstadoPedido!: number;
+  @ManyToOne(() => EstadoPedidoOrmEntity, { nullable: false })
+  @JoinColumn({ name: 'fk_estado_pedido' })
+  estadoPedido!: EstadoPedidoOrmEntity;
 
   @Column({ name: 'creado_en', type: 'timestamptz' })
   creadoEn!: Date;

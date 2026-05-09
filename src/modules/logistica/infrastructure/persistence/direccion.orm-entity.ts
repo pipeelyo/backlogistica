@@ -1,21 +1,29 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { CiudadOrmEntity } from './ciudad.orm-entity';
+import { DepartamentoOrmEntity } from './departamento.orm-entity';
+import { PaisOrmEntity } from './pais.orm-entity';
+import { TipoViaOrmEntity } from './tipo-via.orm-entity';
 
 @Entity({ name: 'direccion' })
 export class DireccionOrmEntity {
-  @PrimaryColumn({ name: 'id_direccion', type: 'integer' })
-  idDireccion!: number;
+  @PrimaryColumn({ name: 'id_direccion', type: 'uuid' })
+  idDireccion!: string;
 
-  @Column({ name: 'fk_tipo_via', type: 'integer' })
-  fkTipoVia!: number;
+  @ManyToOne(() => TipoViaOrmEntity, { nullable: false })
+  @JoinColumn({ name: 'fk_tipo_via' })
+  tipoVia!: TipoViaOrmEntity;
 
-  @Column({ name: 'fk_pais', type: 'integer' })
-  fkPais!: number;
+  @ManyToOne(() => PaisOrmEntity, { nullable: false })
+  @JoinColumn({ name: 'fk_pais' })
+  pais!: PaisOrmEntity;
 
-  @Column({ name: 'fk_departamento', type: 'integer' })
-  fkDepartamento!: number;
+  @ManyToOne(() => DepartamentoOrmEntity, { nullable: false })
+  @JoinColumn({ name: 'fk_departamento' })
+  departamento!: DepartamentoOrmEntity;
 
-  @Column({ name: 'fk_ciudad', type: 'integer' })
-  fkCiudad!: number;
+  @ManyToOne(() => CiudadOrmEntity, { nullable: false })
+  @JoinColumn({ name: 'fk_ciudad' })
+  ciudad!: CiudadOrmEntity;
 
   @Column({ type: 'varchar', length: 160 })
   zona!: string;

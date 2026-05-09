@@ -1,6 +1,6 @@
 export class Ciudad {
   constructor(
-    public readonly idCiudad: number,
+    public readonly idCiudad: string,
     public readonly nombre: string,
     public readonly codigoDane: string,
   ) {}
