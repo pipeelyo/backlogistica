@@ -10,7 +10,6 @@ export function setupSwagger(app: INestApplication): void {
         'La documentación interactiva está en `/docs`.',
     )
     .setVersion('1.0')
-    .addTag('Raíz', 'Página de bienvenida HTML')
     .addTag('Salud', 'Estado del servicio')
     .addTag('Pedidos', 'Consulta de pedidos')
     .addTag('Catálogo', 'Catálogos de apoyo (países, estados, etc.)')

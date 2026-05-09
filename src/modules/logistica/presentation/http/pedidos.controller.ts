@@ -4,6 +4,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { GetPedidoByIdUseCase } from '../../application/get-pedido-by-id.use-case';
@@ -25,6 +26,13 @@ export class PedidosController {
     description:
       'Devuelve pedidos con tipo, estado, método, usuarios, paquete y dirección **solo como nombres** (texto). ' +
       'Opcional: `?fecha=YYYY-MM-DD` filtra por día de `creado_en` en **UTC**.',
+  })
+  @ApiQuery({
+    name: 'fecha',
+    required: false,
+    example: '2026-05-02',
+    description:
+      'Día calendario en UTC (`YYYY-MM-DD`). Si no se envía, se listan todos los pedidos.',
   })
   @ApiOkResponse({ type: PedidoListadoSchema, isArray: true })
   list(@Query() query: ListPedidosQueryDto) {
