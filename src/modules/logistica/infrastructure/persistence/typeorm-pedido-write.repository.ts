@@ -1,62 +1,245 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import type { PedidoListado } from '../../domain/read-models/pedido-listado';
-import type { CreatePedidoInput, PedidoWritePort } from '../../domain/ports/pedido-write.port';
+import type { CreatePedidoFormInput, PedidoWritePort } from '../../domain/ports/pedido-write.port';
 import { pedidoOrmToListado } from './pedido-listado.mapper';
 import { PEDIDO_RELATIONS } from './pedido.orm-relations';
+import { CiudadOrmEntity } from './ciudad.orm-entity';
+import { DireccionOrmEntity } from './direccion.orm-entity';
+import { EstadoPedidoOrmEntity } from './estado-pedido.orm-entity';
+import { MetodoRecepcionOrmEntity } from './metodo-recepcion.orm-entity';
+import { PaqueteOrmEntity } from './paquete.orm-entity';
 import { PedidoOrmEntity } from './pedido.orm-entity';
+import { TipoDocumentoOrmEntity } from './tipo-documento.orm-entity';
+import { TipoPedidoOrmEntity } from './tipo-pedido.orm-entity';
+import { TipoViaOrmEntity } from './tipo-via.orm-entity';
+import { UsuarioOrmEntity } from './usuario.orm-entity';
+
+const TELEFONO_SOLICITUD_PLACEHOLDER = '0000000000';
+
+function generarNumGuia(): string {
+  const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  return `BL-${ymd}-${randomBytes(3).toString('hex').toUpperCase()}`;
+}
+
+function correoPlaceholder(documento: string): string {
+  const safe = documento.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || 'sindoc';
+  return `cliente.${safe}@pedido.backlogistica.local`.slice(0, 254);
+}
+
+function partirNombreEmpresa(empresa: string): { nombres: string; apellidos: string } {
+  const t = empresa.trim();
+  if (t.length <= 120) return { nombres: t, apellidos: '—' };
+  return { nombres: t.slice(0, 120), apellidos: t.slice(120, 240) };
+}
+
+function armarZona(nombreVia: string, placa: string, secundaria: string, obs?: string): string {
+  const core = `${nombreVia.trim()} # ${placa.trim()}-${secundaria.trim()}`.trim();
+  let z = obs?.trim() ? `${core} · ${obs.trim()}` : core;
+  if (z.length > 160) z = `${z.slice(0, 157)}...`;
+  return z;
+}
+
+async function resolverTipoDocumento(
+  manager: EntityManager,
+  abrev: string,
+): Promise<TipoDocumentoOrmEntity> {
+  const rows = await manager.getRepository(TipoDocumentoOrmEntity).find();
+  const key = abrev.trim().toUpperCase();
+  const found = rows.find(
+    (r) => r.abreviacion.trim().toUpperCase() === key || r.nombre.trim().toUpperCase() === key,
+  );
+  if (!found) {
+    throw new BadRequestException(`Tipo de documento no reconocido: "${abrev}"`);
+  }
+  return found;
+}
+
+async function resolverTipoVia(manager: EntityManager, nombre: string): Promise<TipoViaOrmEntity> {
+  const rows = await manager.getRepository(TipoViaOrmEntity).find();
+  const key = nombre.trim().toLowerCase();
+  const found = rows.find((r) => r.nombre.trim().toLowerCase() === key);
+  if (!found) {
+    throw new BadRequestException(`Tipo de vía no encontrado: "${nombre}"`);
+  }
+  return found;
+}
+
+async function resolverCiudad(
+  manager: EntityManager,
+  ciudadNombre: string,
+): Promise<CiudadOrmEntity> {
+  const n = ciudadNombre.trim();
+  const matches = await manager
+    .getRepository(CiudadOrmEntity)
+    .createQueryBuilder('c')
+    .leftJoinAndSelect('c.departamento', 'd')
+    .leftJoinAndSelect('d.pais', 'p')
+    .where('LOWER(TRIM(c.nombre)) = LOWER(TRIM(:nombre))', { nombre: n })
+    .getMany();
+
+  if (matches.length === 0) {
+    throw new BadRequestException(`Ciudad no encontrada: "${n}"`);
+  }
+  if (matches.length > 1) {
+    throw new BadRequestException(`Ciudad ambigua en catálogo: "${n}" (${matches.length} filas)`);
+  }
+  const c = matches[0]!;
+  if (!c.departamento?.pais) {
+    throw new BadRequestException(
+      'La ciudad no tiene departamento/país enlazados. Ejecute y complete los FK de `database/pedidos_form_y_relaciones.sql`.',
+    );
+  }
+  return c;
+}
+
+async function elegirTipoPedido(manager: EntityManager): Promise<TipoPedidoOrmEntity> {
+  const rows = await manager.getRepository(TipoPedidoOrmEntity).find({ order: { nombre: 'ASC' } });
+  if (!rows.length) throw new BadRequestException('Catálogo tipo_pedido vacío.');
+  return rows.find((r) => /envío|envio|estándar|estandar|normal|dom/i.test(r.nombre)) ?? rows[0]!;
+}
+
+async function elegirMetodoRecepcion(manager: EntityManager): Promise<MetodoRecepcionOrmEntity> {
+  const rows = await manager
+    .getRepository(MetodoRecepcionOrmEntity)
+    .find({ order: { nombre: 'ASC' } });
+  if (!rows.length) throw new BadRequestException('Catálogo metodo_recepcion vacío.');
+  return rows.find((r) => /domicilio|entrega|dom/i.test(r.nombre)) ?? rows[0]!;
+}
+
+async function elegirEstadoInicial(manager: EntityManager): Promise<EstadoPedidoOrmEntity> {
+  const rows = await manager
+    .getRepository(EstadoPedidoOrmEntity)
+    .find({ order: { nombre: 'ASC' } });
+  if (!rows.length) throw new BadRequestException('Catálogo estado_pedido vacío.');
+  return rows.find((r) => /pendiente|creado|nuevo|ingres/i.test(r.nombre)) ?? rows[0]!;
+}
 
 @Injectable()
 export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
-  constructor(
-    @InjectRepository(PedidoOrmEntity)
-    private readonly repo: Repository<PedidoOrmEntity>,
-  ) {}
+  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
-  async insertPedido(input: CreatePedidoInput): Promise<PedidoListado> {
-    const id = randomUUID();
-    const creadoEn = new Date();
-    const entity = this.repo.create({
-      idPedido: id,
-      numGuia: input.numGuia,
-      creadoEn,
-      tipoPedido: { idTipoPedido: input.idTipoPedido },
-      usuarioSolicitud: { idUsuario: input.idUsuarioSolicitud },
-      usuarioRecolector: input.idUsuarioRecolector
-        ? { idUsuario: input.idUsuarioRecolector }
-        : null,
-      usuarioRepartidor: input.idUsuarioRepartidor
-        ? { idUsuario: input.idUsuarioRepartidor }
-        : null,
-      metodoRecepcion: { idMetodoRecepcion: input.idMetodoRecepcion },
-      paquete: { idPaquete: input.idPaquete },
-      direccion: { idDireccion: input.idDireccion },
-      estadoPedido: { idEstadoPedido: input.idEstadoPedido },
-    });
+  async createPedidoFromForm(input: CreatePedidoFormInput): Promise<PedidoListado> {
+    return this.dataSource.transaction(async (manager) => {
+      const now = new Date();
+      const doc = input.numeroDocumentoCliente.trim().slice(0, 32);
+      const tipoDoc = await resolverTipoDocumento(manager, input.tipoDocumentoClienteAbrev);
+      const usuarioRepo = manager.getRepository(UsuarioOrmEntity);
 
-    try {
-      await this.repo.save(entity);
-    } catch (e) {
-      if (e instanceof QueryFailedError) {
-        const driver = e.driverError as { code?: string } | undefined;
-        if (driver?.code === '23503') {
-          throw new BadRequestException(
-            'Referencia inválida: compruebe que tipo, usuarios, método, paquete, dirección y estado existen.',
-          );
-        }
+      let usuario = await usuarioRepo.findOne({
+        where: {
+          documento: doc,
+          tipoDocumento: { idTipoDocumento: tipoDoc.idTipoDocumento },
+        },
+      });
+
+      if (!usuario) {
+        const { nombres, apellidos } = partirNombreEmpresa(input.nombreEmpresa);
+        usuario = usuarioRepo.create({
+          idUsuario: randomUUID(),
+          nombres,
+          apellidos,
+          tipoDocumento: { idTipoDocumento: tipoDoc.idTipoDocumento },
+          documento: doc,
+          correo: correoPlaceholder(doc),
+          telefono: TELEFONO_SOLICITUD_PLACEHOLDER,
+          creadoEn: now,
+        });
+        await usuarioRepo.save(usuario);
       }
-      throw e;
-    }
 
-    const row = await this.repo.findOne({
-      where: { idPedido: id },
-      relations: [...PEDIDO_RELATIONS],
+      const tipoVia = await resolverTipoVia(manager, input.tipoViaNombre);
+      const ciudad = await resolverCiudad(manager, input.ciudadNombre);
+      const zona = armarZona(
+        input.nombreVia,
+        input.numeroPlaca,
+        input.numeroSecundario,
+        input.observacionesDireccion,
+      );
+
+      const dirRepo = manager.getRepository(DireccionOrmEntity);
+      const idDireccion = randomUUID();
+      const direccion = dirRepo.create({
+        idDireccion,
+        tipoVia: { idTipoVia: tipoVia.idTipoVia },
+        pais: { idPais: ciudad.departamento!.pais!.idPais },
+        departamento: { idDepartamento: ciudad.departamento!.idDepartamento },
+        ciudad: { idCiudad: ciudad.idCiudad },
+        zona,
+        numeroPrincipal: input.numeroPlaca.trim().slice(0, 32),
+        numeroSecundario: input.numeroSecundario.trim().slice(0, 32),
+        creadoEn: now,
+      });
+      await dirRepo.save(direccion);
+
+      const paqRepo = manager.getRepository(PaqueteOrmEntity);
+      const idPaquete = randomUUID();
+      const paquete = paqRepo.create({
+        idPaquete,
+        nombre: input.tipoProductoNombre.trim().slice(0, 200),
+        peso: input.pesoKg,
+        precio: input.valorDeclarado,
+        creadoEn: now,
+      });
+      await paqRepo.save(paquete);
+
+      const tipoPedido = await elegirTipoPedido(manager);
+      const metodo = await elegirMetodoRecepcion(manager);
+      const estado = await elegirEstadoInicial(manager);
+      const idPedido = randomUUID();
+
+      const pedidoRepo = manager.getRepository(PedidoOrmEntity);
+      const pedido = pedidoRepo.create({
+        idPedido,
+        numGuia: generarNumGuia(),
+        creadoEn: now,
+        tipoPedido: { idTipoPedido: tipoPedido.idTipoPedido },
+        usuarioSolicitud: { idUsuario: usuario.idUsuario },
+        usuarioRecolector: null,
+        usuarioRepartidor: null,
+        metodoRecepcion: { idMetodoRecepcion: metodo.idMetodoRecepcion },
+        paquete: { idPaquete },
+        direccion: { idDireccion },
+        estadoPedido: { idEstadoPedido: estado.idEstadoPedido },
+        fragil: input.fragil,
+        observacionesManifiesto: input.observacionesManifiesto?.trim() || null,
+        destinatarioNombre: input.nombreDestinatario.trim().slice(0, 200),
+        destinatarioTelefono: input.telefonoDestinatario.trim().slice(0, 32),
+        fotosPaqueteUrls: input.fotosPaqueteUrls?.length ? input.fotosPaqueteUrls : null,
+      });
+
+      try {
+        await pedidoRepo.save(pedido);
+      } catch (e) {
+        if (e instanceof QueryFailedError) {
+          const driver = e.driverError as { code?: string; message?: string } | undefined;
+          if (driver?.code === '23503') {
+            throw new BadRequestException(
+              'No se pudo guardar el pedido: referencia inválida (revise catálogo y migraciones).',
+            );
+          }
+          if (
+            driver?.code === '42703' ||
+            /column .* does not exist/i.test(String(driver?.message ?? e.message))
+          ) {
+            throw new BadRequestException(
+              'Faltan columnas en la base (pedidos o relaciones ciudad/departamento/país). Ejecute database/pedidos_form_y_relaciones.sql.',
+            );
+          }
+        }
+        throw e;
+      }
+
+      const row = await pedidoRepo.findOne({
+        where: { idPedido },
+        relations: [...PEDIDO_RELATIONS],
+      });
+      if (!row) {
+        throw new InternalServerErrorException('No se pudo leer el pedido recién creado');
+      }
+      return pedidoOrmToListado(row);
     });
-    if (!row) {
-      throw new InternalServerErrorException('No se pudo leer el pedido recién creado');
-    }
-    return pedidoOrmToListado(row);
   }
 }

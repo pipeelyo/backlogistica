@@ -48,4 +48,19 @@ export class PedidoOrmEntity {
 
   @Column({ name: 'creado_en', type: 'timestamptz' })
   creadoEn!: Date;
+
+  @Column({ name: 'fragil', type: 'boolean', default: false })
+  fragil!: boolean;
+
+  @Column({ name: 'observaciones_manifiesto', type: 'text', nullable: true })
+  observacionesManifiesto!: string | null;
+
+  @Column({ name: 'destinatario_nombre', type: 'varchar', length: 200, nullable: true })
+  destinatarioNombre!: string | null;
+
+  @Column({ name: 'destinatario_telefono', type: 'varchar', length: 32, nullable: true })
+  destinatarioTelefono!: string | null;
+
+  @Column({ name: 'fotos_paquete_urls', type: 'jsonb', nullable: true })
+  fotosPaqueteUrls!: string[] | null;
 }

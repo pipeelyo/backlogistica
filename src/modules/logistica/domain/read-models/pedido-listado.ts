@@ -14,4 +14,9 @@ export interface PedidoListado {
   usuarioRepartidor: string | null;
   paquete: string;
   direccion: string;
+  destinatarioNombre: string | null;
+  destinatarioTelefono: string | null;
+  fragil: boolean;
+  observacionesManifiesto: string | null;
+  fotosPaqueteUrls: string[] | null;
 }

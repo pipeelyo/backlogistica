@@ -60,8 +60,9 @@ export class PedidosController {
   @ApiOperation({
     summary: 'Crear pedido',
     description:
-      'Crea un pedido. El **`id_pedido` (UUID)** y **`creado_en`** los fija el backend al insertar; la respuesta incluye ambos en el listado legible. ' +
-      'Debe enviar FK existentes (tipo, usuarios, método, paquete, dirección, estado). Si alguna FK no existe → **400**.',
+      'Crea un pedido con el **mismo cuerpo que el formulario móvil** (cliente, destinatario, dirección, producto, manifiesto). ' +
+      'El backend genera **`id_pedido`**, **`num_guia`**, **`creado_en`**, elige tipo/método/estado operativos por defecto, resuelve catálogos (tipo doc, tipo vía, ciudad) y crea usuario, dirección y paquete si aplica. ' +
+      'Requiere migración SQL: `database/pedidos_form_y_relaciones.sql`.',
   })
   @ApiBody({ type: CreatePedidoBodyDto })
   @ApiCreatedResponse({

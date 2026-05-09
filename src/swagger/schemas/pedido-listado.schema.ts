@@ -37,4 +37,19 @@ export class PedidoListadoSchema {
     example: 'Bogotá, Cundinamarca, Chapinero',
   })
   direccion!: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  destinatarioNombre!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  destinatarioTelefono!: string | null;
+
+  @ApiProperty()
+  fragil!: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
+  observacionesManifiesto!: string | null;
+
+  @ApiPropertyOptional({ type: [String], nullable: true })
+  fotosPaqueteUrls!: string[] | null;
 }

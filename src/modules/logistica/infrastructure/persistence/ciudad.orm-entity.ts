@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { DepartamentoOrmEntity } from './departamento.orm-entity';
 
 @Entity({ name: 'ciudad' })
 export class CiudadOrmEntity {
@@ -10,4 +11,8 @@ export class CiudadOrmEntity {
 
   @Column({ name: 'codigo_dane', type: 'varchar', length: 16 })
   codigoDane!: string;
+
+  @ManyToOne(() => DepartamentoOrmEntity, { nullable: true })
+  @JoinColumn({ name: 'fk_departamento' })
+  departamento!: DepartamentoOrmEntity | null;
 }

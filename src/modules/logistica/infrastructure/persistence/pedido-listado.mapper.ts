@@ -26,5 +26,10 @@ export function pedidoOrmToListado(row: PedidoOrmEntity): PedidoListado {
     usuarioRepartidor: row.usuarioRepartidor ? nombreUsuario(row.usuarioRepartidor) : null,
     paquete: row.paquete.nombre,
     direccion: etiquetaDireccion(row.direccion),
+    destinatarioNombre: row.destinatarioNombre ?? null,
+    destinatarioTelefono: row.destinatarioTelefono ?? null,
+    fragil: row.fragil ?? false,
+    observacionesManifiesto: row.observacionesManifiesto ?? null,
+    fotosPaqueteUrls: row.fotosPaqueteUrls ?? null,
   };
 }
