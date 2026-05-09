@@ -7,9 +7,21 @@ function nombreUsuario(u: UsuarioOrmEntity): string {
   return `${u.nombres} ${u.apellidos}`.trim();
 }
 
-/** Una sola línea legible para dirección (sin devolver el registro completo). */
+/** Una sola línea legible para dirección (catálogo + vía + # + observaciones resumidas). */
 function etiquetaDireccion(d: DireccionOrmEntity): string {
-  const partes = [d.ciudad?.nombre, d.departamento?.nombre, d.zona].filter(Boolean);
+  const nombreVia = d.nombreVia?.trim() ?? '';
+  const tieneViaDetalle =
+    Boolean(d.tipoVia) &&
+    nombreVia !== '' &&
+    Boolean(d.numeroPrincipal) &&
+    Boolean(d.numeroSecundario);
+  const viaLine = tieneViaDetalle
+    ? `${d.tipoVia!.nombre} ${nombreVia} #${d.numeroPrincipal}-${d.numeroSecundario}`.trim()
+    : d.zona;
+  const obs = d.observacionesEntrega?.trim();
+  const obsCorta =
+    obs && obs.length > 100 ? `${obs.slice(0, 97).replace(/\s+$/, '')}…` : (obs ?? null);
+  const partes = [d.ciudad?.nombre, d.departamento?.nombre, viaLine, obsCorta].filter(Boolean);
   return partes.join(', ');
 }
 
@@ -26,8 +38,8 @@ export function pedidoOrmToListado(row: PedidoOrmEntity): PedidoListado {
     usuarioRepartidor: row.usuarioRepartidor ? nombreUsuario(row.usuarioRepartidor) : null,
     paquete: row.paquete.nombre,
     direccion: etiquetaDireccion(row.direccion),
-    destinatarioNombre: row.destinatarioNombre ?? null,
-    destinatarioTelefono: row.destinatarioTelefono ?? null,
+    destinatarioNombre: row.destinatario?.nombre ?? null,
+    destinatarioTelefono: row.destinatario?.telefono ?? null,
     fragil: row.fragil ?? false,
     observacionesManifiesto: row.observacionesManifiesto ?? null,
     fotosPaqueteUrls: row.fotosPaqueteUrls ?? null,

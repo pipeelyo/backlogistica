@@ -7,6 +7,7 @@ import type { CreatePedidoFormInput, PedidoWritePort } from '../../domain/ports/
 import { pedidoOrmToListado } from './pedido-listado.mapper';
 import { PEDIDO_RELATIONS } from './pedido.orm-relations';
 import { CiudadOrmEntity } from './ciudad.orm-entity';
+import { DestinatarioOrmEntity } from './destinatario.orm-entity';
 import { DireccionOrmEntity } from './direccion.orm-entity';
 import { EstadoPedidoOrmEntity } from './estado-pedido.orm-entity';
 import { MetodoRecepcionOrmEntity } from './metodo-recepcion.orm-entity';
@@ -35,9 +36,15 @@ function partirNombreEmpresa(empresa: string): { nombres: string; apellidos: str
   return { nombres: t.slice(0, 120), apellidos: t.slice(120, 240) };
 }
 
-function armarZona(nombreVia: string, placa: string, secundaria: string, obs?: string): string {
-  const core = `${nombreVia.trim()} # ${placa.trim()}-${secundaria.trim()}`.trim();
-  let z = obs?.trim() ? `${core} · ${obs.trim()}` : core;
+/** Línea corta para `direccion.zona` (tipo + vía + #); las observaciones largas van en `observaciones_entrega`. */
+function armarZonaResumida(
+  tipoViaNombre: string,
+  nombreVia: string,
+  placa: string,
+  secundaria: string,
+): string {
+  let z =
+    `${tipoViaNombre.trim()} ${nombreVia.trim()} # ${placa.trim()}-${secundaria.trim()}`.trim();
   if (z.length > 160) z = `${z.slice(0, 157)}...`;
   return z;
 }
@@ -152,12 +159,14 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
 
       const tipoVia = await resolverTipoVia(manager, input.tipoViaNombre);
       const ciudad = await resolverCiudad(manager, input.ciudadNombre);
-      const zona = armarZona(
-        input.nombreVia,
+      const nombreViaNorm = input.nombreVia.trim().slice(0, 120);
+      const zona = armarZonaResumida(
+        tipoVia.nombre,
+        nombreViaNorm,
         input.numeroPlaca,
         input.numeroSecundario,
-        input.observacionesDireccion,
       );
+      const observacionesEntrega = input.observacionesDireccion?.trim() || null;
 
       const dirRepo = manager.getRepository(DireccionOrmEntity);
       const idDireccion = randomUUID();
@@ -167,6 +176,8 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
         pais: { idPais: ciudad.departamento!.pais!.idPais },
         departamento: { idDepartamento: ciudad.departamento!.idDepartamento },
         ciudad: { idCiudad: ciudad.idCiudad },
+        nombreVia: nombreViaNorm,
+        observacionesEntrega,
         zona,
         numeroPrincipal: input.numeroPlaca.trim().slice(0, 32),
         numeroSecundario: input.numeroSecundario.trim().slice(0, 32),
@@ -190,6 +201,16 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
       const estado = await elegirEstadoInicial(manager);
       const idPedido = randomUUID();
 
+      const destRepo = manager.getRepository(DestinatarioOrmEntity);
+      const idDestinatario = randomUUID();
+      const destinatario = destRepo.create({
+        idDestinatario,
+        nombre: input.nombreDestinatario.trim().slice(0, 200),
+        telefono: input.telefonoDestinatario.trim().slice(0, 32),
+        creadoEn: now,
+      });
+      await destRepo.save(destinatario);
+
       const pedidoRepo = manager.getRepository(PedidoOrmEntity);
       const pedido = pedidoRepo.create({
         idPedido,
@@ -205,8 +226,7 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
         estadoPedido: { idEstadoPedido: estado.idEstadoPedido },
         fragil: input.fragil,
         observacionesManifiesto: input.observacionesManifiesto?.trim() || null,
-        destinatarioNombre: input.nombreDestinatario.trim().slice(0, 200),
-        destinatarioTelefono: input.telefonoDestinatario.trim().slice(0, 32),
+        destinatario: { idDestinatario },
         fotosPaqueteUrls: input.fotosPaqueteUrls?.length ? input.fotosPaqueteUrls : null,
       });
 
@@ -225,7 +245,7 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
             /column .* does not exist/i.test(String(driver?.message ?? e.message))
           ) {
             throw new BadRequestException(
-              'Faltan columnas en la base (pedidos o relaciones ciudad/departamento/país). Ejecute database/pedidos_form_y_relaciones.sql.',
+              'Faltan columnas o FK en la base. Revise database/pedidos_form_y_relaciones.sql, database/destinatario.sql y database/direccion_informacion_envio.sql.',
             );
           }
         }
