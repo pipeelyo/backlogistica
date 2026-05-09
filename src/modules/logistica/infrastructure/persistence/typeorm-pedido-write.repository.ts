@@ -17,7 +17,7 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
 
   async insertPedido(input: CreatePedidoInput): Promise<PedidoListado> {
     const id = randomUUID();
-    const creadoEn = input.creadoEn ? new Date(input.creadoEn) : new Date();
+    const creadoEn = new Date();
     const entity = this.repo.create({
       idPedido: id,
       numGuia: input.numGuia,

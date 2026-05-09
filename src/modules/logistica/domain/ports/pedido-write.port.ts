@@ -1,6 +1,6 @@
 import type { PedidoListado } from '../read-models/pedido-listado';
 
-/** Datos para persistir un pedido (FKs por UUID; cuerpo de `POST /pedidos`). El `id_pedido` lo asigna el servidor. */
+/** Datos para persistir un pedido (FKs por UUID; cuerpo de `POST /pedidos`). `id_pedido` y `creado_en` los asigna el servidor. */
 export type CreatePedidoInput = {
   numGuia: string;
   idTipoPedido: string;
@@ -11,8 +11,6 @@ export type CreatePedidoInput = {
   idPaquete: string;
   idDireccion: string;
   idEstadoPedido: string;
-  /** ISO 8601; si se omite, se usa la fecha/hora actual en el servidor. */
-  creadoEn?: string;
 };
 
 export interface PedidoWritePort {

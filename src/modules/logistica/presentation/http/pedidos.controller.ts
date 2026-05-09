@@ -60,7 +60,7 @@ export class PedidosController {
   @ApiOperation({
     summary: 'Crear pedido',
     description:
-      'Crea un pedido. El **`id_pedido` (UUID) lo genera el backend**; la respuesta incluye ese id junto con el resto del listado legible. ' +
+      'Crea un pedido. El **`id_pedido` (UUID)** y **`creado_en`** los fija el backend al insertar; la respuesta incluye ambos en el listado legible. ' +
       'Debe enviar FK existentes (tipo, usuarios, método, paquete, dirección, estado). Si alguna FK no existe → **400**.',
   })
   @ApiBody({ type: CreatePedidoBodyDto })

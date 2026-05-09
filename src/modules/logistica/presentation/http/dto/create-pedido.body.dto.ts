@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsISO8601, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class CreatePedidoBodyDto {
   @ApiProperty({ example: 'GUA-001-2026' })
@@ -49,12 +49,4 @@ export class CreatePedidoBodyDto {
   @ApiProperty({ format: 'uuid', description: 'FK `estado_pedido`' })
   @IsUUID()
   idEstadoPedido!: string;
-
-  @ApiPropertyOptional({
-    description: 'Momento de creación (ISO 8601). Si se omite, el servidor usa `now()`.',
-    example: '2026-05-06T12:00:00.000Z',
-  })
-  @IsOptional()
-  @IsISO8601({ strict: true })
-  creadoEn?: string;
 }
