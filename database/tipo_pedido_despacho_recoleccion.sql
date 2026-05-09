@@ -1,5 +1,7 @@
 -- Supabase → SQL Editor.
--- Crea la tabla `tipo_pedido` (si no existe) y deja dos filas para `POST /pedidos` con `tipoOperacion` DESPACHO | RECOLECCION.
+-- Crea la tabla **catálogo** `tipo_pedido` (si no existe) y semillas Despacho / Recolección.
+-- La clave foránea **no va aquí**: cada pedido guarda `pedidos.fk_tipo_pedido` → `tipo_pedido.id_tipo_pedido`
+-- (ver `database/pedidos_fk_tipo_pedido.sql` si falta la columna en `pedidos`).
 
 CREATE TABLE IF NOT EXISTS public.tipo_pedido (
   id_tipo_pedido uuid PRIMARY KEY DEFAULT gen_random_uuid (),
