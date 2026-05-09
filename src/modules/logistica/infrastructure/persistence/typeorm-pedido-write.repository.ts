@@ -1,8 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import type { PedidoListado } from '../../domain/read-models/pedido-listado';
-import type { PedidoWritePort, PutPedidoInput } from '../../domain/ports/pedido-write.port';
+import type { CreatePedidoInput, PedidoWritePort } from '../../domain/ports/pedido-write.port';
 import { pedidoOrmToListado } from './pedido-listado.mapper';
 import { PEDIDO_RELATIONS } from './pedido.orm-relations';
 import { PedidoOrmEntity } from './pedido.orm-entity';
@@ -14,7 +15,8 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
     private readonly repo: Repository<PedidoOrmEntity>,
   ) {}
 
-  async insertPedido(id: string, input: PutPedidoInput): Promise<PedidoListado> {
+  async insertPedido(input: CreatePedidoInput): Promise<PedidoListado> {
+    const id = randomUUID();
     const creadoEn = input.creadoEn ? new Date(input.creadoEn) : new Date();
     const entity = this.repo.create({
       idPedido: id,

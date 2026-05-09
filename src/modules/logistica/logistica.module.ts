@@ -7,7 +7,7 @@ import { ListMetodosRecepcionUseCase } from './application/list-metodos-recepcio
 import { ListPaisesUseCase } from './application/list-paises.use-case';
 import { GetPedidoByIdUseCase } from './application/get-pedido-by-id.use-case';
 import { ListPedidosUseCase } from './application/list-pedidos.use-case';
-import { PutPedidoUseCase } from './application/put-pedido.use-case';
+import { CreatePedidoUseCase } from './application/create-pedido.use-case';
 import { ListRolesUseCase } from './application/list-roles.use-case';
 import { ListTiposDocumentoUseCase } from './application/list-tipos-documento.use-case';
 import { ListTiposPedidoUseCase } from './application/list-tipos-pedido.use-case';
@@ -45,7 +45,7 @@ import { PedidosController } from './presentation/http/pedidos.controller';
     ListTiposViaUseCase,
     ListPedidosUseCase,
     GetPedidoByIdUseCase,
-    PutPedidoUseCase,
+    CreatePedidoUseCase,
   ],
   exports: [TypeOrmModule],
 })

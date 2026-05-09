@@ -6,13 +6,12 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
-  Put,
+  Post,
   Query,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
-  ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -21,20 +20,20 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { CreatePedidoUseCase } from '../../application/create-pedido.use-case';
 import { GetPedidoByIdUseCase } from '../../application/get-pedido-by-id.use-case';
 import { ListPedidosUseCase } from '../../application/list-pedidos.use-case';
-import { PutPedidoUseCase } from '../../application/put-pedido.use-case';
 import { PedidoListadoSchema } from '../../../../swagger/schemas/pedido-listado.schema';
+import { CreatePedidoBodyDto } from './dto/create-pedido.body.dto';
 import { ListPedidosQueryDto } from './dto/list-pedidos.query.dto';
-import { PutPedidoBodyDto } from './dto/put-pedido.body.dto';
 
 @ApiTags('Pedidos')
 @Controller('pedidos')
 export class PedidosController {
   constructor(
     private readonly listPedidos: ListPedidosUseCase,
+    private readonly createPedido: CreatePedidoUseCase,
     private readonly getPedidoById: GetPedidoByIdUseCase,
-    private readonly putPedido: PutPedidoUseCase,
   ) {}
 
   @Get()
@@ -56,24 +55,22 @@ export class PedidosController {
     return this.listPedidos.execute(query.fecha ? { fecha: query.fecha } : undefined);
   }
 
-  @Put(':id')
+  @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Crear pedido',
     description:
-      'Crea un pedido cuyo `id_pedido` es el UUID de la ruta. Debe enviar las FK existentes (tipo, usuarios, método, paquete, dirección, estado). ' +
-      'Si ese id ya existe → **409 Conflict**. Si alguna FK no existe → **400**.',
+      'Crea un pedido. El **`id_pedido` (UUID) lo genera el backend**; la respuesta incluye ese id junto con el resto del listado legible. ' +
+      'Debe enviar FK existentes (tipo, usuarios, método, paquete, dirección, estado). Si alguna FK no existe → **400**.',
   })
-  @ApiParam({ name: 'id', format: 'uuid', description: 'Será el `id_pedido` del nuevo registro' })
-  @ApiBody({ type: PutPedidoBodyDto })
+  @ApiBody({ type: CreatePedidoBodyDto })
   @ApiCreatedResponse({
     type: PedidoListadoSchema,
-    description: 'Pedido creado (mismo formato que en GET)',
+    description: 'Pedido creado; `idPedido` es el UUID asignado por el servidor',
   })
-  @ApiConflictResponse({ description: 'Ya existe un pedido con ese id' })
   @ApiBadRequestResponse({ description: 'FK inexistente u otro error de validación de datos' })
-  crear(@Param('id', ParseUUIDPipe) id: string, @Body() body: PutPedidoBodyDto) {
-    return this.putPedido.execute(id, body);
+  crear(@Body() body: CreatePedidoBodyDto) {
+    return this.createPedido.execute(body);
   }
 
   @Get(':id')

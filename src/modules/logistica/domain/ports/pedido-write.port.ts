@@ -1,7 +1,7 @@
 import type { PedidoListado } from '../read-models/pedido-listado';
 
-/** Datos para persistir un pedido (FKs por UUID; coincide con el cuerpo de `PUT /pedidos/:id`). */
-export type PutPedidoInput = {
+/** Datos para persistir un pedido (FKs por UUID; cuerpo de `POST /pedidos`). El `id_pedido` lo asigna el servidor. */
+export type CreatePedidoInput = {
   numGuia: string;
   idTipoPedido: string;
   idUsuarioSolicitud: string;
@@ -16,6 +16,6 @@ export type PutPedidoInput = {
 };
 
 export interface PedidoWritePort {
-  /** Inserta el pedido con `idPedido === id`. No comprueba duplicados (lo hace el caso de uso). */
-  insertPedido(id: string, input: PutPedidoInput): Promise<PedidoListado>;
+  /** Inserta un pedido con `id_pedido` generado en el servidor. */
+  insertPedido(input: CreatePedidoInput): Promise<PedidoListado>;
 }

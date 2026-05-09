@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsISO8601, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
-export class PutPedidoBodyDto {
+export class CreatePedidoBodyDto {
   @ApiProperty({ example: 'GUA-001-2026' })
   @IsString()
   @MinLength(1)
