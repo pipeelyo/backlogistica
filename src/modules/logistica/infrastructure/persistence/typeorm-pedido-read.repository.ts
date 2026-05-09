@@ -1,13 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import type {
-  CatalogoNombreDto,
-  DireccionResumenDto,
-  PaqueteResumenDto,
-  PedidoListado,
-  UsuarioResumenDto,
-} from '../../domain/read-models/pedido-listado';
+import type { PedidoListado } from '../../domain/read-models/pedido-listado';
 import { PedidoReadPort } from '../../domain/ports/pedido-read.port';
 import { DireccionOrmEntity } from './direccion.orm-entity';
 import { PedidoOrmEntity } from './pedido.orm-entity';
@@ -28,45 +22,14 @@ const PEDIDO_RELATIONS = [
   'direccion.ciudad',
 ] as const;
 
-function cat(id: string, nombre: string): CatalogoNombreDto {
-  return { id, nombre };
+function nombreUsuario(u: UsuarioOrmEntity): string {
+  return `${u.nombres} ${u.apellidos}`.trim();
 }
 
-function mapUsuario(u: UsuarioOrmEntity): UsuarioResumenDto {
-  return {
-    id: u.idUsuario,
-    nombres: u.nombres,
-    apellidos: u.apellidos,
-    correo: u.correo,
-    documento: u.documento,
-    telefono: u.telefono,
-  };
-}
-
-function mapDireccion(d: DireccionOrmEntity): DireccionResumenDto {
-  return {
-    id: d.idDireccion,
-    zona: d.zona,
-    numeroPrincipal: d.numeroPrincipal,
-    numeroSecundario: d.numeroSecundario,
-    tipoVia: cat(d.tipoVia.idTipoVia, d.tipoVia.nombre),
-    pais: { id: d.pais.idPais, nombre: d.pais.nombre, codigoDane: d.pais.codigoDane },
-    departamento: {
-      id: d.departamento.idDepartamento,
-      nombre: d.departamento.nombre,
-      codigoDane: d.departamento.codigoDane,
-    },
-    ciudad: { id: d.ciudad.idCiudad, nombre: d.ciudad.nombre, codigoDane: d.ciudad.codigoDane },
-  };
-}
-
-function mapPaquete(p: { idPaquete: string; nombre: string; peso: number; precio: number }): PaqueteResumenDto {
-  return {
-    id: p.idPaquete,
-    nombre: p.nombre,
-    peso: p.peso,
-    precio: p.precio,
-  };
+/** Una sola línea legible para dirección (sin devolver el registro completo). */
+function etiquetaDireccion(d: DireccionOrmEntity): string {
+  const partes = [d.ciudad?.nombre, d.departamento?.nombre, d.zona].filter(Boolean);
+  return partes.join(', ');
 }
 
 function toListado(row: PedidoOrmEntity): PedidoListado {
@@ -74,14 +37,14 @@ function toListado(row: PedidoOrmEntity): PedidoListado {
     idPedido: row.idPedido,
     numGuia: row.numGuia,
     creadoEn: row.creadoEn.toISOString(),
-    tipoPedido: cat(row.tipoPedido.idTipoPedido, row.tipoPedido.nombre),
-    estadoPedido: cat(row.estadoPedido.idEstadoPedido, row.estadoPedido.nombre),
-    metodoRecepcion: cat(row.metodoRecepcion.idMetodoRecepcion, row.metodoRecepcion.nombre),
-    usuarioSolicitud: mapUsuario(row.usuarioSolicitud),
-    usuarioRecolector: row.usuarioRecolector ? mapUsuario(row.usuarioRecolector) : null,
-    usuarioRepartidor: row.usuarioRepartidor ? mapUsuario(row.usuarioRepartidor) : null,
-    paquete: mapPaquete(row.paquete),
-    direccion: mapDireccion(row.direccion),
+    tipoPedido: row.tipoPedido.nombre,
+    estadoPedido: row.estadoPedido.nombre,
+    metodoRecepcion: row.metodoRecepcion.nombre,
+    usuarioSolicitud: nombreUsuario(row.usuarioSolicitud),
+    usuarioRecolector: row.usuarioRecolector ? nombreUsuario(row.usuarioRecolector) : null,
+    usuarioRepartidor: row.usuarioRepartidor ? nombreUsuario(row.usuarioRepartidor) : null,
+    paquete: row.paquete.nombre,
+    direccion: etiquetaDireccion(row.direccion),
   };
 }
 
