@@ -4,6 +4,7 @@ export const PEDIDO_RELATIONS = [
   'estadoPedido',
   'metodoRecepcion',
   'usuarioSolicitud',
+  'cliente',
   'usuarioRecolector',
   'usuarioRepartidor',
   'paquete',
@@ -12,4 +13,5 @@ export const PEDIDO_RELATIONS = [
   'direccion.pais',
   'direccion.departamento',
   'direccion.ciudad',
+  'destinatario',
 ] as const;

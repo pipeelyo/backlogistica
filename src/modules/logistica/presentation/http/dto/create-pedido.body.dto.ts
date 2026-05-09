@@ -7,30 +7,21 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
 
-/** Cuerpo de `POST /pedidos` — mismo shape que el formulario móvil "Nuevo pedido". */
+/** Cuerpo de `POST /pedidos` — sin repetir datos del cliente: se envía solo `idCliente` (tabla `cliente`). */
 export class CreatePedidoBodyDto {
-  @ApiProperty({ example: 'ACME SAS' })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(240)
-  nombreEmpresa!: string;
-
-  @ApiProperty({ description: 'Abreviatura del tipo de documento (ej. CC, NIT)', example: 'NIT' })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(16)
-  tipoDocumentoClienteAbrev!: string;
-
-  @ApiProperty({ example: '900123456-7' })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(32)
-  numeroDocumentoCliente!: string;
+  @ApiProperty({
+    format: 'uuid',
+    description:
+      'Id del registro en tabla `cliente` (empresa + `fk_usuario`). Documento y tipo están en `usuarios`.',
+  })
+  @IsUUID()
+  idCliente!: string;
 
   @ApiProperty({ example: 'María Pérez' })
   @IsString()

@@ -1,4 +1,6 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryColumn } from 'typeorm';
+import { ClienteOrmEntity } from './cliente.orm-entity';
+import { DestinatarioOrmEntity } from './destinatario.orm-entity';
 import { DireccionOrmEntity } from './direccion.orm-entity';
 import { EstadoPedidoOrmEntity } from './estado-pedido.orm-entity';
 import { MetodoRecepcionOrmEntity } from './metodo-recepcion.orm-entity';
@@ -21,6 +23,10 @@ export class PedidoOrmEntity {
   @ManyToOne(() => UsuarioOrmEntity, { nullable: false })
   @JoinColumn({ name: 'fk_usuario_solicitud' })
   usuarioSolicitud!: UsuarioOrmEntity;
+
+  @ManyToOne(() => ClienteOrmEntity, { nullable: true })
+  @JoinColumn({ name: 'fk_cliente' })
+  cliente!: ClienteOrmEntity | null;
 
   @ManyToOne(() => UsuarioOrmEntity, { nullable: true })
   @JoinColumn({ name: 'fk_usuario_recolector' })
@@ -55,11 +61,9 @@ export class PedidoOrmEntity {
   @Column({ name: 'observaciones_manifiesto', type: 'text', nullable: true })
   observacionesManifiesto!: string | null;
 
-  @Column({ name: 'destinatario_nombre', type: 'varchar', length: 200, nullable: true })
-  destinatarioNombre!: string | null;
-
-  @Column({ name: 'destinatario_telefono', type: 'varchar', length: 32, nullable: true })
-  destinatarioTelefono!: string | null;
+  @OneToOne(() => DestinatarioOrmEntity, { nullable: true })
+  @JoinColumn({ name: 'fk_destinatario' })
+  destinatario!: DestinatarioOrmEntity | null;
 
   @Column({ name: 'fotos_paquete_urls', type: 'jsonb', nullable: true })
   fotosPaqueteUrls!: string[] | null;

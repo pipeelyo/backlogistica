@@ -2,13 +2,10 @@ import type { PedidoListado } from '../read-models/pedido-listado';
 
 /**
  * Payload público alineado con el formulario "Nuevo pedido" (app).
- * UUIDs, `creado_en`, `num_guia`, catálogos operativos y filas relacionadas los resuelve el backend.
+ * Los datos del cliente comercial vienen de la tabla `cliente` (`idCliente`); documento/tipo están en `usuarios`.
  */
 export type CreatePedidoFormInput = {
-  nombreEmpresa: string;
-  /** Ej. `CC`, `NIT` — se cruza con `tipo_documento.abreviacion`. */
-  tipoDocumentoClienteAbrev: string;
-  numeroDocumentoCliente: string;
+  idCliente: string;
   nombreDestinatario: string;
   telefonoDestinatario: string;
   /** Nombre del tipo de vía (ej. Calle, Carrera) según catálogo `tipo_via`. */

@@ -7,6 +7,13 @@ function nombreUsuario(u: UsuarioOrmEntity): string {
   return `${u.nombres} ${u.apellidos}`.trim();
 }
 
+/** Texto del solicitante: `cliente.nombre_empresa` si hay fila cliente; si no, nombre del usuario. */
+function etiquetaSolicitante(row: PedidoOrmEntity): string {
+  const empresa = row.cliente?.nombreEmpresa?.trim();
+  if (empresa) return empresa;
+  return nombreUsuario(row.usuarioSolicitud);
+}
+
 /** Una sola línea legible para dirección (catálogo + vía + # + observaciones resumidas). */
 function etiquetaDireccion(d: DireccionOrmEntity): string {
   const nombreVia = d.nombreVia?.trim() ?? '';
@@ -33,7 +40,7 @@ export function pedidoOrmToListado(row: PedidoOrmEntity): PedidoListado {
     tipoPedido: row.tipoPedido.nombre,
     estadoPedido: row.estadoPedido.nombre,
     metodoRecepcion: row.metodoRecepcion.nombre,
-    usuarioSolicitud: nombreUsuario(row.usuarioSolicitud),
+    usuarioSolicitud: etiquetaSolicitante(row),
     usuarioRecolector: row.usuarioRecolector ? nombreUsuario(row.usuarioRecolector) : null,
     usuarioRepartidor: row.usuarioRepartidor ? nombreUsuario(row.usuarioRepartidor) : null,
     paquete: row.paquete.nombre,

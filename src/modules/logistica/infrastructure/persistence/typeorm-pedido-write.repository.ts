@@ -7,33 +7,19 @@ import type { CreatePedidoFormInput, PedidoWritePort } from '../../domain/ports/
 import { pedidoOrmToListado } from './pedido-listado.mapper';
 import { PEDIDO_RELATIONS } from './pedido.orm-relations';
 import { CiudadOrmEntity } from './ciudad.orm-entity';
+import { ClienteOrmEntity } from './cliente.orm-entity';
 import { DestinatarioOrmEntity } from './destinatario.orm-entity';
 import { DireccionOrmEntity } from './direccion.orm-entity';
 import { EstadoPedidoOrmEntity } from './estado-pedido.orm-entity';
 import { MetodoRecepcionOrmEntity } from './metodo-recepcion.orm-entity';
 import { PaqueteOrmEntity } from './paquete.orm-entity';
 import { PedidoOrmEntity } from './pedido.orm-entity';
-import { TipoDocumentoOrmEntity } from './tipo-documento.orm-entity';
 import { TipoPedidoOrmEntity } from './tipo-pedido.orm-entity';
 import { TipoViaOrmEntity } from './tipo-via.orm-entity';
-import { UsuarioOrmEntity } from './usuario.orm-entity';
-
-const TELEFONO_SOLICITUD_PLACEHOLDER = '0000000000';
 
 function generarNumGuia(): string {
   const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   return `BL-${ymd}-${randomBytes(3).toString('hex').toUpperCase()}`;
-}
-
-function correoPlaceholder(documento: string): string {
-  const safe = documento.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || 'sindoc';
-  return `cliente.${safe}@pedido.backlogistica.local`.slice(0, 254);
-}
-
-function partirNombreEmpresa(empresa: string): { nombres: string; apellidos: string } {
-  const t = empresa.trim();
-  if (t.length <= 120) return { nombres: t, apellidos: '—' };
-  return { nombres: t.slice(0, 120), apellidos: t.slice(120, 240) };
 }
 
 /** Línea corta para `direccion.zona` (tipo + vía + #); las observaciones largas van en `observaciones_entrega`. */
@@ -47,21 +33,6 @@ function armarZonaResumida(
     `${tipoViaNombre.trim()} ${nombreVia.trim()} # ${placa.trim()}-${secundaria.trim()}`.trim();
   if (z.length > 160) z = `${z.slice(0, 157)}...`;
   return z;
-}
-
-async function resolverTipoDocumento(
-  manager: EntityManager,
-  abrev: string,
-): Promise<TipoDocumentoOrmEntity> {
-  const rows = await manager.getRepository(TipoDocumentoOrmEntity).find();
-  const key = abrev.trim().toUpperCase();
-  const found = rows.find(
-    (r) => r.abreviacion.trim().toUpperCase() === key || r.nombre.trim().toUpperCase() === key,
-  );
-  if (!found) {
-    throw new BadRequestException(`Tipo de documento no reconocido: "${abrev}"`);
-  }
-  return found;
 }
 
 async function resolverTipoVia(manager: EntityManager, nombre: string): Promise<TipoViaOrmEntity> {
@@ -131,31 +102,15 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
   async createPedidoFromForm(input: CreatePedidoFormInput): Promise<PedidoListado> {
     return this.dataSource.transaction(async (manager) => {
       const now = new Date();
-      const doc = input.numeroDocumentoCliente.trim().slice(0, 32);
-      const tipoDoc = await resolverTipoDocumento(manager, input.tipoDocumentoClienteAbrev);
-      const usuarioRepo = manager.getRepository(UsuarioOrmEntity);
 
-      let usuario = await usuarioRepo.findOne({
-        where: {
-          documento: doc,
-          tipoDocumento: { idTipoDocumento: tipoDoc.idTipoDocumento },
-        },
+      const cliente = await manager.getRepository(ClienteOrmEntity).findOne({
+        where: { idCliente: input.idCliente },
+        relations: ['usuario'],
       });
-
-      if (!usuario) {
-        const { nombres, apellidos } = partirNombreEmpresa(input.nombreEmpresa);
-        usuario = usuarioRepo.create({
-          idUsuario: randomUUID(),
-          nombres,
-          apellidos,
-          tipoDocumento: { idTipoDocumento: tipoDoc.idTipoDocumento },
-          documento: doc,
-          correo: correoPlaceholder(doc),
-          telefono: TELEFONO_SOLICITUD_PLACEHOLDER,
-          creadoEn: now,
-        });
-        await usuarioRepo.save(usuario);
+      if (!cliente?.usuario) {
+        throw new BadRequestException(`Cliente no encontrado o sin usuario: ${input.idCliente}`);
       }
+      const usuario = cliente.usuario;
 
       const tipoVia = await resolverTipoVia(manager, input.tipoViaNombre);
       const ciudad = await resolverCiudad(manager, input.ciudadNombre);
@@ -218,6 +173,7 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
         creadoEn: now,
         tipoPedido: { idTipoPedido: tipoPedido.idTipoPedido },
         usuarioSolicitud: { idUsuario: usuario.idUsuario },
+        cliente: { idCliente: cliente.idCliente },
         usuarioRecolector: null,
         usuarioRepartidor: null,
         metodoRecepcion: { idMetodoRecepcion: metodo.idMetodoRecepcion },
@@ -245,7 +201,7 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
             /column .* does not exist/i.test(String(driver?.message ?? e.message))
           ) {
             throw new BadRequestException(
-              'Faltan columnas o FK en la base. Revise database/pedidos_form_y_relaciones.sql, database/destinatario.sql y database/direccion_informacion_envio.sql.',
+              'Faltan columnas o FK en la base. Revise database/cliente.sql, database/pedidos_form_y_relaciones.sql, database/destinatario.sql y database/direccion_informacion_envio.sql.',
             );
           }
         }

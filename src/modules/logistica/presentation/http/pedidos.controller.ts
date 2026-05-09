@@ -60,9 +60,10 @@ export class PedidosController {
   @ApiOperation({
     summary: 'Crear pedido',
     description:
-      'Crea un pedido con el **mismo cuerpo que el formulario móvil** (cliente, destinatario, dirección, producto, manifiesto). ' +
-      'El backend genera **`id_pedido`**, **`num_guia`**, **`creado_en`**, elige tipo/método/estado operativos por defecto, resuelve catálogos (tipo doc, tipo vía, ciudad) y crea usuario, dirección y paquete si aplica. ' +
-      'Requiere migración SQL: `database/pedidos_form_y_relaciones.sql`.',
+      'Crea un pedido con el cuerpo del formulario (destinatario, dirección, producto, manifiesto). ' +
+      '**Datos del cliente:** envíe solo `idCliente` (tabla `cliente`); empresa y documento salen de ahí y de `usuarios`. ' +
+      'El backend genera **`id_pedido`**, **`num_guia`**, **`creado_en`**, elige tipo/método/estado por defecto y resuelve catálogos (tipo vía, ciudad). ' +
+      'Requiere SQL: `database/cliente.sql` y los scripts previos de pedidos/dirección/destinatario.',
   })
   @ApiBody({ type: CreatePedidoBodyDto })
   @ApiCreatedResponse({

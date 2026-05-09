@@ -1,5 +1,7 @@
+import { ClienteOrmEntity } from './infrastructure/persistence/cliente.orm-entity';
 import { CiudadOrmEntity } from './infrastructure/persistence/ciudad.orm-entity';
 import { DepartamentoOrmEntity } from './infrastructure/persistence/departamento.orm-entity';
+import { DestinatarioOrmEntity } from './infrastructure/persistence/destinatario.orm-entity';
 import { DireccionOrmEntity } from './infrastructure/persistence/direccion.orm-entity';
 import { EstadoPedidoOrmEntity } from './infrastructure/persistence/estado-pedido.orm-entity';
 import { MetodoRecepcionOrmEntity } from './infrastructure/persistence/metodo-recepcion.orm-entity';
@@ -24,7 +26,9 @@ export const LOGISTICA_TYPEORM_ENTITIES = [
   CiudadOrmEntity,
   PaqueteOrmEntity,
   UsuarioOrmEntity,
+  ClienteOrmEntity,
   DireccionOrmEntity,
+  DestinatarioOrmEntity,
   PedidoOrmEntity,
   RolOrmEntity,
 ] as const;
