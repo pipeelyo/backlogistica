@@ -2,12 +2,6 @@ import { Controller, Get, Header } from '@nestjs/common';
 
 @Controller()
 export class AppController {
-  @Get('ping')
-  @Header('Content-Type', 'text/plain; charset=utf-8')
-  ping(): string {
-    return 'pong';
-  }
-
   /** Evita pantalla en blanco al abrir http://localhost:3000/ en el navegador (solo API). */
   @Get()
   @Header('Content-Type', 'text/html; charset=utf-8')
@@ -31,13 +25,17 @@ export class AppController {
   <h1>Backlogistica API</h1>
   <p>Esta app es una <strong>API REST</strong>, no una web con interfaz. Usa estas rutas:</p>
   <ul>
-    <li><a href="/ping"><code>/ping</code></a> — respuesta en texto (<code>pong</code>), útil si el visor no muestra JSON</li>
-    <li><a href="/health"><code>/health</code></a> — estado (HTML en navegador, JSON con <code>Accept: application/json</code>)</li>
+    <li><a href="/health"><code>/health</code></a> — estado (HTML en navegador; JSON con <code>Accept: application/json</code> o <code>curl</code>)</li>
+    <li><a href="/pedidos"><code>/pedidos</code></a> — listado de pedidos</li>
     <li><a href="/catalogo/paises"><code>/catalogo/paises</code></a></li>
     <li><a href="/catalogo/departamentos"><code>/catalogo/departamentos</code></a></li>
     <li><a href="/catalogo/ciudades"><code>/catalogo/ciudades</code></a></li>
     <li><a href="/catalogo/estados-pedido"><code>/catalogo/estados-pedido</code></a></li>
     <li><a href="/catalogo/roles"><code>/catalogo/roles</code></a></li>
+    <li><a href="/catalogo/tipos-pedido"><code>/catalogo/tipos-pedido</code></a></li>
+    <li><a href="/catalogo/metodos-recepcion"><code>/catalogo/metodos-recepcion</code></a></li>
+    <li><a href="/catalogo/tipos-documento"><code>/catalogo/tipos-documento</code></a></li>
+    <li><a href="/catalogo/tipos-via"><code>/catalogo/tipos-via</code></a></li>
   </ul>
   <p>Servidor en puerto <code>${port}</code>.</p>
 </body>

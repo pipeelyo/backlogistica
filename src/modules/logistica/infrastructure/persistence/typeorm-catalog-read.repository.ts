@@ -5,13 +5,21 @@ import { CatalogReadPort } from '../../domain/ports/catalog-read.port';
 import { Ciudad } from '../../domain/entities/ciudad.entity';
 import { Departamento } from '../../domain/entities/departamento.entity';
 import { EstadoPedido } from '../../domain/entities/estado-pedido.entity';
+import { MetodoRecepcion } from '../../domain/entities/metodo-recepcion.entity';
 import { Pais } from '../../domain/entities/pais.entity';
 import { Rol } from '../../domain/entities/rol.entity';
+import { TipoDocumento } from '../../domain/entities/tipo-documento.entity';
+import { TipoPedido } from '../../domain/entities/tipo-pedido.entity';
+import { TipoVia } from '../../domain/entities/tipo-via.entity';
 import { CiudadOrmEntity } from './ciudad.orm-entity';
 import { DepartamentoOrmEntity } from './departamento.orm-entity';
 import { EstadoPedidoOrmEntity } from './estado-pedido.orm-entity';
+import { MetodoRecepcionOrmEntity } from './metodo-recepcion.orm-entity';
 import { PaisOrmEntity } from './pais.orm-entity';
 import { RolOrmEntity } from './rol.orm-entity';
+import { TipoDocumentoOrmEntity } from './tipo-documento.orm-entity';
+import { TipoPedidoOrmEntity } from './tipo-pedido.orm-entity';
+import { TipoViaOrmEntity } from './tipo-via.orm-entity';
 
 @Injectable()
 export class TypeOrmCatalogReadRepository implements CatalogReadPort {
@@ -26,6 +34,14 @@ export class TypeOrmCatalogReadRepository implements CatalogReadPort {
     private readonly estadoPedidoRepo: Repository<EstadoPedidoOrmEntity>,
     @InjectRepository(RolOrmEntity)
     private readonly rolRepo: Repository<RolOrmEntity>,
+    @InjectRepository(TipoPedidoOrmEntity)
+    private readonly tipoPedidoRepo: Repository<TipoPedidoOrmEntity>,
+    @InjectRepository(MetodoRecepcionOrmEntity)
+    private readonly metodoRecepcionRepo: Repository<MetodoRecepcionOrmEntity>,
+    @InjectRepository(TipoDocumentoOrmEntity)
+    private readonly tipoDocumentoRepo: Repository<TipoDocumentoOrmEntity>,
+    @InjectRepository(TipoViaOrmEntity)
+    private readonly tipoViaRepo: Repository<TipoViaOrmEntity>,
   ) {}
 
   async listPaises(): Promise<Pais[]> {
@@ -51,5 +67,25 @@ export class TypeOrmCatalogReadRepository implements CatalogReadPort {
   async listRoles(): Promise<Rol[]> {
     const rows = await this.rolRepo.find({ order: { nombre: 'ASC' } });
     return rows.map((r) => new Rol(r.idRol, r.nombre));
+  }
+
+  async listTiposPedido(): Promise<TipoPedido[]> {
+    const rows = await this.tipoPedidoRepo.find({ order: { nombre: 'ASC' } });
+    return rows.map((r) => new TipoPedido(r.idTipoPedido, r.nombre));
+  }
+
+  async listMetodosRecepcion(): Promise<MetodoRecepcion[]> {
+    const rows = await this.metodoRecepcionRepo.find({ order: { nombre: 'ASC' } });
+    return rows.map((r) => new MetodoRecepcion(r.idMetodoRecepcion, r.nombre));
+  }
+
+  async listTiposDocumento(): Promise<TipoDocumento[]> {
+    const rows = await this.tipoDocumentoRepo.find({ order: { nombre: 'ASC' } });
+    return rows.map((r) => new TipoDocumento(r.idTipoDocumento, r.nombre, r.abreviacion));
+  }
+
+  async listTiposVia(): Promise<TipoVia[]> {
+    const rows = await this.tipoViaRepo.find({ order: { nombre: 'ASC' } });
+    return rows.map((r) => new TipoVia(r.idTipoVia, r.nombre));
   }
 }

@@ -44,7 +44,7 @@ export class HealthController {
   <p>Estado: <strong>${data.status}</strong></p>
   <p>Marca de tiempo: <code>${data.timestamp}</code></p>
   <p>Para JSON (API): envía la cabecera <code>Accept: application/json</code> o usa <code>curl</code>.</p>
-  <p><a href="/">Volver al inicio</a> · <a href="/ping"><code>/ping</code></a> (texto plano)</p>
+  <p><a href="/">Volver al inicio</a></p>
 </body>
 </html>`;
   }
