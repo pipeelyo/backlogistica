@@ -7,6 +7,7 @@ import { ListMetodosRecepcionUseCase } from './application/list-metodos-recepcio
 import { ListPaisesUseCase } from './application/list-paises.use-case';
 import { GetPedidoByIdUseCase } from './application/get-pedido-by-id.use-case';
 import { ListPedidosUseCase } from './application/list-pedidos.use-case';
+import { PutPedidoUseCase } from './application/put-pedido.use-case';
 import { ListRolesUseCase } from './application/list-roles.use-case';
 import { ListTiposDocumentoUseCase } from './application/list-tipos-documento.use-case';
 import { ListTiposPedidoUseCase } from './application/list-tipos-pedido.use-case';
@@ -14,8 +15,9 @@ import { ListTiposViaUseCase } from './application/list-tipos-via.use-case';
 import { CATALOG_READ } from './catalog.tokens';
 import { TypeOrmCatalogReadRepository } from './infrastructure/persistence/typeorm-catalog-read.repository';
 import { TypeOrmPedidoReadRepository } from './infrastructure/persistence/typeorm-pedido-read.repository';
+import { TypeOrmPedidoWriteRepository } from './infrastructure/persistence/typeorm-pedido-write.repository';
 import { LOGISTICA_TYPEORM_ENTITIES } from './logistica.persistence.entities';
-import { PEDIDO_READ } from './pedidos.tokens';
+import { PEDIDO_READ, PEDIDO_WRITE } from './pedidos.tokens';
 import { CatalogoController } from './presentation/http/catalogo.controller';
 import { PedidosController } from './presentation/http/pedidos.controller';
 
@@ -30,6 +32,8 @@ import { PedidosController } from './presentation/http/pedidos.controller';
     { provide: CATALOG_READ, useExisting: TypeOrmCatalogReadRepository },
     TypeOrmPedidoReadRepository,
     { provide: PEDIDO_READ, useExisting: TypeOrmPedidoReadRepository },
+    TypeOrmPedidoWriteRepository,
+    { provide: PEDIDO_WRITE, useExisting: TypeOrmPedidoWriteRepository },
     ListPaisesUseCase,
     ListDepartamentosUseCase,
     ListCiudadesUseCase,
@@ -41,6 +45,7 @@ import { PedidosController } from './presentation/http/pedidos.controller';
     ListTiposViaUseCase,
     ListPedidosUseCase,
     GetPedidoByIdUseCase,
+    PutPedidoUseCase,
   ],
   exports: [TypeOrmModule],
 })

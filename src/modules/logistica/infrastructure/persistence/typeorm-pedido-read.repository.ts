@@ -4,50 +4,9 @@ import { Between, Repository } from 'typeorm';
 import type { PedidoListado } from '../../domain/read-models/pedido-listado';
 import type { ListPedidosFilter } from '../../domain/ports/pedido-read.port';
 import { PedidoReadPort } from '../../domain/ports/pedido-read.port';
-import { DireccionOrmEntity } from './direccion.orm-entity';
+import { pedidoOrmToListado } from './pedido-listado.mapper';
+import { PEDIDO_RELATIONS } from './pedido.orm-relations';
 import { PedidoOrmEntity } from './pedido.orm-entity';
-import { UsuarioOrmEntity } from './usuario.orm-entity';
-
-const PEDIDO_RELATIONS = [
-  'tipoPedido',
-  'estadoPedido',
-  'metodoRecepcion',
-  'usuarioSolicitud',
-  'usuarioRecolector',
-  'usuarioRepartidor',
-  'paquete',
-  'direccion',
-  'direccion.tipoVia',
-  'direccion.pais',
-  'direccion.departamento',
-  'direccion.ciudad',
-] as const;
-
-function nombreUsuario(u: UsuarioOrmEntity): string {
-  return `${u.nombres} ${u.apellidos}`.trim();
-}
-
-/** Una sola línea legible para dirección (sin devolver el registro completo). */
-function etiquetaDireccion(d: DireccionOrmEntity): string {
-  const partes = [d.ciudad?.nombre, d.departamento?.nombre, d.zona].filter(Boolean);
-  return partes.join(', ');
-}
-
-function toListado(row: PedidoOrmEntity): PedidoListado {
-  return {
-    idPedido: row.idPedido,
-    numGuia: row.numGuia,
-    creadoEn: row.creadoEn.toISOString(),
-    tipoPedido: row.tipoPedido.nombre,
-    estadoPedido: row.estadoPedido.nombre,
-    metodoRecepcion: row.metodoRecepcion.nombre,
-    usuarioSolicitud: nombreUsuario(row.usuarioSolicitud),
-    usuarioRecolector: row.usuarioRecolector ? nombreUsuario(row.usuarioRecolector) : null,
-    usuarioRepartidor: row.usuarioRepartidor ? nombreUsuario(row.usuarioRepartidor) : null,
-    paquete: row.paquete.nombre,
-    direccion: etiquetaDireccion(row.direccion),
-  };
-}
 
 /** Inicio y fin (inclusive) del día `YYYY-MM-DD` en UTC para `Between` en `timestamptz`. */
 function rangoDiaUtc(fechaYmd: string): { desde: Date; hasta: Date } {
@@ -75,11 +34,11 @@ export class TypeOrmPedidoReadRepository implements PedidoReadPort {
         ...base,
         where: { creadoEn: Between(desde, hasta) },
       });
-      return rows.map(toListado);
+      return rows.map(pedidoOrmToListado);
     }
 
     const rows = await this.repo.find(base);
-    return rows.map(toListado);
+    return rows.map(pedidoOrmToListado);
   }
 
   async findPedidoById(id: string): Promise<PedidoListado | null> {
@@ -87,6 +46,6 @@ export class TypeOrmPedidoReadRepository implements PedidoReadPort {
       where: { idPedido: id },
       relations: [...PEDIDO_RELATIONS],
     });
-    return row ? toListado(row) : null;
+    return row ? pedidoOrmToListado(row) : null;
   }
 }
