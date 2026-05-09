@@ -1,6 +1,7 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { parse } from 'pg-connection-string';
 
 const logger = new Logger('DatabaseModule');
 
@@ -58,21 +59,35 @@ const logger = new Logger('DatabaseModule');
         }
 
         const synchronize = config.get<string>('TYPEORM_SYNC', 'false') === 'true';
+        const useSsl = config.get<string>('DATABASE_SSL', 'true') !== 'false';
+
+        // No usar solo `url`: TypeORM/pg a veces no aplican bien `ssl` y falla el certificado
+        // ("self-signed certificate in certificate chain"). Parseo + campos explícitos evita eso.
+        const normalized = url.replace(/^postgres:\/\//i, 'postgresql://');
+        const parsed = parse(normalized, { useLibpqCompat: true });
+
+        if (!parsed.host) {
+          throw new Error('DATABASE_URL no contiene un host válido tras parsearla.');
+        }
+
+        const port = parsed.port ? Number.parseInt(String(parsed.port), 10) : 5432;
+        const pooled = url.includes('pooler.supabase.com') || port === 6543;
+
+        const sslConfig: boolean | { rejectUnauthorized: boolean } = useSsl
+          ? { rejectUnauthorized: false }
+          : false;
 
         return {
           type: 'postgres' as const,
-          url,
+          host: parsed.host,
+          port,
+          username: parsed.user ?? '',
+          password: parsed.password ?? '',
+          database: parsed.database ?? 'postgres',
           autoLoadEntities: true,
           synchronize,
-          ssl:
-            config.get<string>('DATABASE_SSL', 'true') !== 'false'
-              ? { rejectUnauthorized: false }
-              : false,
-          // Pooler de Supabase (puerto 6543): desactiva prepared statements en el driver `pg`.
-          extra:
-            url.includes('pooler.supabase.com') || url.includes(':6543')
-              ? { prepareThreshold: 0 }
-              : undefined,
+          ssl: sslConfig,
+          extra: pooled ? { prepareThreshold: 0 } : undefined,
         };
       },
     }),

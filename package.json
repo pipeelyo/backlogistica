@@ -26,6 +26,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "pg": "^8.13.1",
+    "pg-connection-string": "^2.12.0",
     "typeorm": "^0.3.20"
   },
   "devDependencies": {
