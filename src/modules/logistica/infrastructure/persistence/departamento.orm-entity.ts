@@ -1,6 +1,6 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
-import { PaisOrmEntity } from './pais.orm-entity';
+import { Column, Entity, PrimaryColumn } from 'typeorm';
 
+/** Catálogo de departamento (sin FK a `pais`: el país va en `direccion.fk_pais`). */
 @Entity({ name: 'departamento' })
 export class DepartamentoOrmEntity {
   @PrimaryColumn({ name: 'id_departamento', type: 'uuid' })
@@ -11,8 +11,4 @@ export class DepartamentoOrmEntity {
 
   @Column({ name: 'codigo_dane', type: 'varchar', length: 16 })
   codigoDane!: string;
-
-  @ManyToOne(() => PaisOrmEntity, { nullable: true })
-  @JoinColumn({ name: 'fk_pais' })
-  pais!: PaisOrmEntity | null;
 }

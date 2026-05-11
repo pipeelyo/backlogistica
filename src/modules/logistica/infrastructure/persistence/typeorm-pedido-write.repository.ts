@@ -1,28 +1,46 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import type { PedidoListado } from '../../domain/read-models/pedido-listado';
-import type { CreatePedidoFormInput, PedidoWritePort } from '../../domain/ports/pedido-write.port';
+import type { PedidoTipoOperacion } from '../../domain/pedido-tipo-operacion';
+import type { PedidoReadPort } from '../../domain/ports/pedido-read.port';
+import type {
+  CreatePedidoFormInput,
+  PedidoWritePort,
+  UpdatePedidoInput,
+} from '../../domain/ports/pedido-write.port';
+import { PEDIDO_READ } from '../../pedidos.tokens';
 import { pedidoOrmToListado } from './pedido-listado.mapper';
 import { PEDIDO_RELATIONS } from './pedido.orm-relations';
 import { CiudadOrmEntity } from './ciudad.orm-entity';
-import { ClienteOrmEntity } from './cliente.orm-entity';
+import { DepartamentoOrmEntity } from './departamento.orm-entity';
+import { PaisOrmEntity } from './pais.orm-entity';
 import { DestinatarioOrmEntity } from './destinatario.orm-entity';
 import { DireccionOrmEntity } from './direccion.orm-entity';
 import { EstadoPedidoOrmEntity } from './estado-pedido.orm-entity';
 import { MetodoRecepcionOrmEntity } from './metodo-recepcion.orm-entity';
 import { PaqueteOrmEntity } from './paquete.orm-entity';
 import { PedidoOrmEntity } from './pedido.orm-entity';
+import { RolOrmEntity } from './rol.orm-entity';
 import { TipoPedidoOrmEntity } from './tipo-pedido.orm-entity';
 import { TipoViaOrmEntity } from './tipo-via.orm-entity';
+import { UsuarioOrmEntity } from './usuario.orm-entity';
+import { UsuarioRolOrmEntity } from './usuario-rol.orm-entity';
+import { SupabaseEvidenciasStorage } from '../storage/supabase-evidencias.storage';
 
 function generarNumGuia(): string {
   const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   return `BL-${ymd}-${randomBytes(3).toString('hex').toUpperCase()}`;
 }
 
-/** Línea corta para `direccion.zona` (tipo + vía + #); las observaciones largas van en `observaciones_entrega`. */
+/** Línea corta para `direccion.zona` (tipo + vía + #); las observaciones largas van en `direccion.observaciones`. */
 function armarZonaResumida(
   tipoViaNombre: string,
   nombreVia: string,
@@ -45,38 +63,97 @@ async function resolverTipoVia(manager: EntityManager, nombre: string): Promise<
   return found;
 }
 
-async function resolverCiudad(
+/** `ciudad` sin FK a depto en BD: se cargan ciudad y departamento por ids para armar `direccion`. */
+async function cargarGeografiaDireccion(
   manager: EntityManager,
-  ciudadNombre: string,
-): Promise<CiudadOrmEntity> {
-  const n = ciudadNombre.trim();
-  const matches = await manager
-    .getRepository(CiudadOrmEntity)
-    .createQueryBuilder('c')
-    .leftJoinAndSelect('c.departamento', 'd')
-    .leftJoinAndSelect('d.pais', 'p')
-    .where('LOWER(TRIM(c.nombre)) = LOWER(TRIM(:nombre))', { nombre: n })
-    .getMany();
+  input: CreatePedidoFormInput,
+): Promise<{ ciudad: CiudadOrmEntity; departamento: DepartamentoOrmEntity; pais: PaisOrmEntity }> {
+  const idC = input.idCiudad.trim();
+  const ciudad = await manager.getRepository(CiudadOrmEntity).findOne({ where: { idCiudad: idC } });
+  if (!ciudad) {
+    throw new BadRequestException(`Ciudad no encontrada por id_ciudad=${idC}`);
+  }
 
-  if (matches.length === 0) {
-    throw new BadRequestException(`Ciudad no encontrada: "${n}"`);
+  const idDep = input.idDepartamento.trim();
+  const departamento = await manager.getRepository(DepartamentoOrmEntity).findOne({
+    where: { idDepartamento: idDep },
+  });
+  if (!departamento) {
+    throw new BadRequestException(`Departamento no encontrado por id_departamento=${idDep}`);
   }
-  if (matches.length > 1) {
-    throw new BadRequestException(`Ciudad ambigua en catálogo: "${n}" (${matches.length} filas)`);
+
+  const idP = input.idPais.trim();
+  const pais = await manager.getRepository(PaisOrmEntity).findOne({ where: { idPais: idP } });
+  if (!pais) {
+    throw new BadRequestException(`País no encontrado por id_pais=${idP}`);
   }
-  const c = matches[0]!;
-  if (!c.departamento?.pais) {
-    throw new BadRequestException(
-      'La ciudad no tiene departamento/país enlazados. Ejecute y complete los FK de `database/pedidos_form_y_relaciones.sql`.',
-    );
-  }
-  return c;
+  return { ciudad, departamento, pais };
 }
 
-async function elegirTipoPedido(manager: EntityManager): Promise<TipoPedidoOrmEntity> {
+async function cargarGeografiaPorIds(
+  manager: EntityManager,
+  idCiudad: string,
+  idDepartamento: string,
+  idPais: string,
+): Promise<{ ciudad: CiudadOrmEntity; departamento: DepartamentoOrmEntity; pais: PaisOrmEntity }> {
+  const idC = idCiudad.trim();
+  const ciudad = await manager.getRepository(CiudadOrmEntity).findOne({ where: { idCiudad: idC } });
+  if (!ciudad) throw new BadRequestException(`Ciudad no encontrada por id_ciudad=${idC}`);
+  const idDep = idDepartamento.trim();
+  const departamento = await manager.getRepository(DepartamentoOrmEntity).findOne({
+    where: { idDepartamento: idDep },
+  });
+  if (!departamento) throw new BadRequestException(`Departamento no encontrado por id_departamento=${idDep}`);
+  const idP = idPais.trim();
+  const pais = await manager.getRepository(PaisOrmEntity).findOne({ where: { idPais: idP } });
+  if (!pais) throw new BadRequestException(`País no encontrado por id_pais=${idP}`);
+  return { ciudad, departamento, pais };
+}
+
+const GEO_PATCH_KEYS = [
+  'idCiudad',
+  'idDepartamento',
+  'idPais',
+  'tipoViaNombre',
+  'nombreVia',
+  'numeroPlaca',
+  'numeroSecundario',
+] as const;
+
+function assertGeoPatchCompleto(patch: UpdatePedidoInput): void {
+  const any = GEO_PATCH_KEYS.some((k) => patch[k] !== undefined);
+  if (!any) return;
+  const missing = GEO_PATCH_KEYS.filter(
+    (k) => patch[k] === undefined || String(patch[k]).trim() === '',
+  );
+  if (missing.length) {
+    throw new BadRequestException(
+      `Para actualizar la dirección debe enviar todos estos campos (sin vacíos): ${GEO_PATCH_KEYS.join(', ')}.`,
+    );
+  }
+}
+
+async function resolverTipoPedidoPorOperacion(
+  manager: EntityManager,
+  operacion: PedidoTipoOperacion,
+): Promise<TipoPedidoOrmEntity> {
   const rows = await manager.getRepository(TipoPedidoOrmEntity).find({ order: { nombre: 'ASC' } });
-  if (!rows.length) throw new BadRequestException('Catálogo tipo_pedido vacío.');
-  return rows.find((r) => /envío|envio|estándar|estandar|normal|dom/i.test(r.nombre)) ?? rows[0]!;
+  if (!rows.length) {
+    throw new BadRequestException('Catálogo tipo_pedido vacío.');
+  }
+  const patterns =
+    operacion === 'DESPACHO'
+      ? [/despacho/i, /env[ií]o/i, /entrega/i, /domicilio/i, /delivery/i]
+      : [/recolec/i, /recolecta/i, /pickup/i, /retiro/i, /recogida/i];
+  for (const re of patterns) {
+    const found = rows.find((r) => re.test(r.nombre));
+    if (found) return found;
+  }
+  const nombres = rows.map((r) => `"${r.nombre}"`).join(', ');
+  throw new BadRequestException(
+    `No hay ningún tipo_pedido que encaje con la operación "${operacion}". ` +
+      `Cree filas claras en catálogo (ej. "Despacho" y "Recolección") o ajuste los nombres. Actuales: ${nombres}`,
+  );
 }
 
 async function elegirMetodoRecepcion(manager: EntityManager): Promise<MetodoRecepcionOrmEntity> {
@@ -87,135 +164,462 @@ async function elegirMetodoRecepcion(manager: EntityManager): Promise<MetodoRece
   return rows.find((r) => /domicilio|entrega|dom/i.test(r.nombre)) ?? rows[0]!;
 }
 
-async function elegirEstadoInicial(manager: EntityManager): Promise<EstadoPedidoOrmEntity> {
-  const rows = await manager
-    .getRepository(EstadoPedidoOrmEntity)
-    .find({ order: { nombre: 'ASC' } });
-  if (!rows.length) throw new BadRequestException('Catálogo estado_pedido vacío.');
-  return rows.find((r) => /pendiente|creado|nuevo|ingres/i.test(r.nombre)) ?? rows[0]!;
+/** Estado **creado** por defecto (tu catálogo); sobrescribible con `PEDIDO_ESTADO_INICIAL_ID`. */
+const DEFAULT_ID_ESTADO_PEDIDO_CREACION = 'ea973ee7-bb82-423c-b37e-5b6c28b484be';
+
+async function resolverEstadoPedidoCreacion(manager: EntityManager): Promise<EstadoPedidoOrmEntity> {
+  const idEstado =
+    process.env.PEDIDO_ESTADO_INICIAL_ID?.trim() || DEFAULT_ID_ESTADO_PEDIDO_CREACION;
+  const estado = await manager.getRepository(EstadoPedidoOrmEntity).findOne({
+    where: { idEstadoPedido: idEstado },
+  });
+  if (!estado) {
+    throw new BadRequestException(
+      `Estado inicial del pedido no encontrado en catálogo \`estado_pedido\`: id_estado_pedido=${idEstado}. ` +
+        'Verifique el UUID del estado **creado** o defina `PEDIDO_ESTADO_INICIAL_ID` en el entorno.',
+    );
+  }
+  return estado;
+}
+
+/**
+ * Tras `POST /pedidos`: `observaciones_manifiesto` / `fotos_paquete_urls` no están en tu tabla `pedidos`.
+ * Se devuelve texto del body; fotos se reemplazan por URLs públicas si se subieron a Supabase (`opts.fotosPublicas`).
+ */
+function listadoPostCreacionConCamposNoPersistidos(
+  listado: PedidoListado,
+  input: CreatePedidoFormInput,
+  opts?: { fotosPublicas?: string[] | null },
+): PedidoListado {
+  const fotosFinal =
+    opts?.fotosPublicas !== undefined
+      ? opts.fotosPublicas && opts.fotosPublicas.length
+        ? opts.fotosPublicas
+        : null
+      : listado.fotosPaqueteUrls ??
+        (input.fotosPaqueteUrls?.length ? input.fotosPaqueteUrls : null) ??
+        null;
+
+  return {
+    ...listado,
+    observacionesManifiesto:
+      listado.observacionesManifiesto ?? (input.observacionesManifiesto?.trim() || null),
+    fotosPaqueteUrls: fotosFinal,
+  };
+}
+
+/** Usuario existente con rol **CLIENTE** o **ADMIN** en `usuario_rol` → `rol`. */
+async function cargarUsuarioSolicitanteAutorizado(
+  manager: EntityManager,
+  idUsuario: string,
+): Promise<UsuarioOrmEntity> {
+  const usuario = await manager.getRepository(UsuarioOrmEntity).findOne({
+    where: { idUsuario },
+  });
+  if (!usuario) {
+    throw new BadRequestException(
+      `Usuario no encontrado: ${idUsuario}. Ejemplo de id documentado para pruebas: b0829465-0779-4366-a29a-6feb6c88cbba`,
+    );
+  }
+  let conRolPermitido = 0;
+  try {
+    conRolPermitido = await manager
+      .getRepository(UsuarioRolOrmEntity)
+      .createQueryBuilder('ur')
+      .innerJoin(RolOrmEntity, 'rol', 'rol.id_rol = ur.id_rol')
+      .where('ur.id_usuario = :id', { id: idUsuario })
+      .andWhere("(lower(trim(rol.nombre)) = 'cliente' OR lower(trim(rol.nombre)) = 'admin')")
+      .getCount();
+  } catch (e) {
+    if (e instanceof QueryFailedError) {
+      const code = (e.driverError as { code?: string } | undefined)?.code;
+      const pgMsg = String((e.driverError as { message?: string } | undefined)?.message ?? e.message);
+      if (code === '42703' || code === '42P01') {
+        throw new BadRequestException(
+          `No se pudo validar roles en usuario_rol: ${pgMsg}. ` +
+            'Compruebe que existan las tablas `usuario_rol` y `rol` y columnas `id_usuario` / `id_rol` en `usuario_rol`.',
+        );
+      }
+    }
+    throw e;
+  }
+  if (conRolPermitido === 0) {
+    throw new BadRequestException(
+      `El usuario debe tener rol CLIENTE o ADMIN en usuario_rol (id_usuario=${idUsuario}).`,
+    );
+  }
+  return usuario;
 }
 
 @Injectable()
 export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
-  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+  private readonly logger = new Logger(TypeOrmPedidoWriteRepository.name);
+
+  constructor(
+    @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly evidencias: SupabaseEvidenciasStorage,
+    @Inject(PEDIDO_READ) private readonly pedidoRead: PedidoReadPort,
+  ) {}
 
   async createPedidoFromForm(input: CreatePedidoFormInput): Promise<PedidoListado> {
-    return this.dataSource.transaction(async (manager) => {
-      const now = new Date();
+    const txnLabel = randomBytes(3).toString('hex').toUpperCase();
+    const t0 = Date.now();
+    this.logger.log(
+      `TX[${txnLabel}] begin crear pedido idUsuario=${input.idUsuario} tipoOperacion=${input.tipoOperacion} idCiudad=${input.idCiudad.trim()} idDepartamento=${input.idDepartamento.trim()} idPais=${input.idPais.trim()}`,
+    );
 
-      const cliente = await manager.getRepository(ClienteOrmEntity).findOne({
-        where: { idCliente: input.idCliente },
-        relations: ['usuario'],
-      });
-      if (!cliente?.usuario) {
-        throw new BadRequestException(`Cliente no encontrado o sin usuario: ${input.idCliente}`);
-      }
-      const usuario = cliente.usuario;
+    const idPedido = randomUUID();
 
-      const tipoVia = await resolverTipoVia(manager, input.tipoViaNombre);
-      const ciudad = await resolverCiudad(manager, input.ciudadNombre);
-      const nombreViaNorm = input.nombreVia.trim().slice(0, 120);
-      const zona = armarZonaResumida(
-        tipoVia.nombre,
-        nombreViaNorm,
-        input.numeroPlaca,
-        input.numeroSecundario,
+    const fotosCrudas = [
+      ...(input.fotosPaqueteUrls ?? []).map((s) => s.trim()).filter(Boolean),
+      ...(input.fotosPaqueteBase64 ?? []).map((s) => s.trim()).filter(Boolean),
+    ];
+    if (fotosCrudas.length > 8) {
+      throw new BadRequestException(
+        'Máximo 8 fotos en total entre `fotosPaqueteUrls` y `fotosPaqueteBase64`.',
       );
-      const observacionesEntrega = input.observacionesDireccion?.trim() || null;
+    }
 
-      const dirRepo = manager.getRepository(DireccionOrmEntity);
-      const idDireccion = randomUUID();
-      const direccion = dirRepo.create({
-        idDireccion,
-        tipoVia: { idTipoVia: tipoVia.idTipoVia },
-        pais: { idPais: ciudad.departamento!.pais!.idPais },
-        departamento: { idDepartamento: ciudad.departamento!.idDepartamento },
-        ciudad: { idCiudad: ciudad.idCiudad },
-        nombreVia: nombreViaNorm,
-        observacionesEntrega,
-        zona,
-        numeroPrincipal: input.numeroPlaca.trim().slice(0, 32),
-        numeroSecundario: input.numeroSecundario.trim().slice(0, 32),
-        creadoEn: now,
-      });
-      await dirRepo.save(direccion);
+    let fotosPublicas: string[] | null = null;
+    if (fotosCrudas.length > 0) {
+      fotosPublicas = await this.evidencias.resolverFotosPedido(idPedido, fotosCrudas);
+      fotosPublicas = fotosPublicas.length ? fotosPublicas : null;
+      this.logger.log(
+        `TX[${txnLabel}] storage bucket=evidencias prefijo=pedidos/${idPedido}/ urls=${fotosPublicas?.length ?? 0}`,
+      );
+    }
 
-      const paqRepo = manager.getRepository(PaqueteOrmEntity);
-      const idPaquete = randomUUID();
-      const paquete = paqRepo.create({
-        idPaquete,
-        nombre: input.tipoProductoNombre.trim().slice(0, 200),
-        peso: input.pesoKg,
-        precio: input.valorDeclarado,
-        creadoEn: now,
-      });
-      await paqRepo.save(paquete);
+    const manifiestoTxt = input.observacionesManifiesto?.trim();
+    if (manifiestoTxt) {
+      await this.evidencias.guardarManifiestoPedido(idPedido, manifiestoTxt);
+      this.logger.log(`TX[${txnLabel}] storage manifiesto.txt pedidos/${idPedido}/`);
+    }
 
-      const tipoPedido = await elegirTipoPedido(manager);
-      const metodo = await elegirMetodoRecepcion(manager);
-      const estado = await elegirEstadoInicial(manager);
-      const idPedido = randomUUID();
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        this.logger.log(`TX[${txnLabel}] postgres BEGIN`);
 
-      const destRepo = manager.getRepository(DestinatarioOrmEntity);
-      const idDestinatario = randomUUID();
-      const destinatario = destRepo.create({
-        idDestinatario,
-        nombre: input.nombreDestinatario.trim().slice(0, 200),
-        telefono: input.telefonoDestinatario.trim().slice(0, 32),
-        creadoEn: now,
-      });
-      await destRepo.save(destinatario);
+        const now = new Date();
 
-      const pedidoRepo = manager.getRepository(PedidoOrmEntity);
-      const pedido = pedidoRepo.create({
-        idPedido,
-        numGuia: generarNumGuia(),
-        creadoEn: now,
-        tipoPedido: { idTipoPedido: tipoPedido.idTipoPedido },
-        usuarioSolicitud: { idUsuario: usuario.idUsuario },
-        cliente: { idCliente: cliente.idCliente },
-        usuarioRecolector: null,
-        usuarioRepartidor: null,
-        metodoRecepcion: { idMetodoRecepcion: metodo.idMetodoRecepcion },
-        paquete: { idPaquete },
-        direccion: { idDireccion },
-        estadoPedido: { idEstadoPedido: estado.idEstadoPedido },
-        fragil: input.fragil,
-        observacionesManifiesto: input.observacionesManifiesto?.trim() || null,
-        destinatario: { idDestinatario },
-        fotosPaqueteUrls: input.fotosPaqueteUrls?.length ? input.fotosPaqueteUrls : null,
-      });
+        const usuario = await cargarUsuarioSolicitanteAutorizado(manager, input.idUsuario);
 
-      try {
-        await pedidoRepo.save(pedido);
-      } catch (e) {
-        if (e instanceof QueryFailedError) {
-          const driver = e.driverError as { code?: string; message?: string } | undefined;
-          if (driver?.code === '23503') {
-            throw new BadRequestException(
-              'No se pudo guardar el pedido: referencia inválida (revise catálogo y migraciones).',
-            );
+        const tipoVia = await resolverTipoVia(manager, input.tipoViaNombre);
+        const { ciudad, departamento, pais } = await cargarGeografiaDireccion(manager, input);
+        const nombreViaNorm = input.nombreVia.trim().slice(0, 120);
+        const zona = armarZonaResumida(
+          tipoVia.nombre,
+          nombreViaNorm,
+          input.numeroPlaca,
+          input.numeroSecundario,
+        );
+        const observacionesEntrega = input.observacionesDireccion?.trim() || null;
+
+        const dirRepo = manager.getRepository(DireccionOrmEntity);
+        const idDireccion = randomUUID();
+        const direccion = dirRepo.create({
+          idDireccion,
+          tipoVia: { idTipoVia: tipoVia.idTipoVia },
+          pais: { idPais: pais.idPais },
+          departamento: { idDepartamento: departamento.idDepartamento },
+          ciudad: { idCiudad: ciudad.idCiudad },
+          observacionesEntrega,
+          zona,
+          numeroPrincipal: input.numeroPlaca.trim().slice(0, 32),
+          numeroSecundario: input.numeroSecundario.trim().slice(0, 32),
+          creadoEn: now,
+        });
+        await dirRepo.save(direccion);
+        this.logger.log(`TX[${txnLabel}] insert direccion id_direccion=${idDireccion}`);
+
+        const paqRepo = manager.getRepository(PaqueteOrmEntity);
+        const idPaquete = randomUUID();
+        const paquete = paqRepo.create({
+          idPaquete,
+          nombre: input.tipoProductoNombre.trim().slice(0, 200),
+          peso: input.pesoKg,
+          precio: input.valorDeclarado,
+          creadoEn: now,
+        });
+        await paqRepo.save(paquete);
+        this.logger.log(`TX[${txnLabel}] insert paquete id_paquete=${idPaquete}`);
+
+        const tipoPedido = await resolverTipoPedidoPorOperacion(manager, input.tipoOperacion);
+        const metodo = await elegirMetodoRecepcion(manager);
+        const estado = await resolverEstadoPedidoCreacion(manager);
+
+        const destRepo = manager.getRepository(DestinatarioOrmEntity);
+        const idDestinatario = randomUUID();
+        const destinatario = destRepo.create({
+          idDestinatario,
+          nombre: input.nombreDestinatario.trim().slice(0, 200),
+          telefono: input.telefonoDestinatario.trim().slice(0, 32),
+          creadoEn: now,
+        });
+        await destRepo.save(destinatario);
+        this.logger.log(`TX[${txnLabel}] insert destinatario id_destinatario=${idDestinatario}`);
+
+        const monto = Number(input.valorDeclarado);
+        const fechaEntrega = new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+        );
+
+        const pedidoRepo = manager.getRepository(PedidoOrmEntity);
+        const pedido = pedidoRepo.create({
+          idPedido,
+          numGuia: generarNumGuia(),
+          creadoEn: now,
+          tipoPedido: { idTipoPedido: tipoPedido.idTipoPedido },
+          usuarioSolicitud: { idUsuario: usuario.idUsuario },
+          fkCliente: null,
+          usuarioRecolector: null,
+          usuarioRepartidor: null,
+          metodoRecepcion: { idMetodoRecepcion: metodo.idMetodoRecepcion },
+          paquete: { idPaquete },
+          direccion: { idDireccion },
+          estadoPedido: { idEstadoPedido: estado.idEstadoPedido },
+          precio: monto,
+          valorDeclarado: monto,
+          fechaEntrega,
+          fragil: input.fragil,
+          observacionesManifiesto: input.observacionesManifiesto?.trim() || null,
+          destinatario: { idDestinatario },
+          fotosPaqueteUrls: null,
+        });
+
+        try {
+          await pedidoRepo.save(pedido);
+        } catch (e) {
+          if (e instanceof QueryFailedError) {
+            const driver = e.driverError as { code?: string; message?: string } | undefined;
+            const pgMsg = String(driver?.message ?? e.message ?? '');
+            if (driver?.code === '23503') {
+              throw new BadRequestException(
+                'No se pudo guardar el pedido: referencia inválida (revise catálogo y migraciones).',
+              );
+            }
+            if (driver?.code === '23502') {
+              throw new BadRequestException(
+                `Restricción NOT NULL en la base al insertar pedido: ${pgMsg}. ` +
+                  'Revise columnas obligatorias en `pedidos` y que el cuerpo / ORM las cubran (p. ej. `valor_declarado`, `precio`, `fecha_entrega`).',
+              );
+            }
+            if (
+              driver?.code === '42703' ||
+              /column .* does not exist/i.test(pgMsg)
+            ) {
+              throw new BadRequestException(
+                `Postgres (${driver?.code ?? '42703'}): ${pgMsg}. ` +
+                  'Revise el nombre de la columna o tabla frente al ORM (`pedidos`, `direccion`, `destinatario`, `paquete`).',
+              );
+            }
+            if (driver?.code === '42P01') {
+              throw new BadRequestException(
+                `Tabla o relación no encontrada en Postgres: ${pgMsg}. Revise nombres de tablas (p. ej. \`usuario_rol\`, columnas \`id_usuario\` / \`id_rol\`).`,
+              );
+            }
           }
-          if (
-            driver?.code === '42703' ||
-            /column .* does not exist/i.test(String(driver?.message ?? e.message))
-          ) {
-            throw new BadRequestException(
-              'Faltan columnas o FK en la base. Revise database/cliente.sql, database/pedidos_form_y_relaciones.sql, database/destinatario.sql y database/direccion_informacion_envio.sql.',
-            );
-          }
+          throw e;
         }
-        throw e;
+
+        this.logger.log(
+          `TX[${txnLabel}] insert pedido id_pedido=${idPedido} num_guia=${pedido.numGuia} fk_tipo_pedido=${tipoPedido.idTipoPedido}`,
+        );
+
+        const row = await pedidoRepo.findOne({
+          where: { idPedido },
+          relations: [...PEDIDO_RELATIONS],
+        });
+        if (!row) {
+          throw new InternalServerErrorException('No se pudo leer el pedido recién creado');
+        }
+        this.logger.log(
+          `TX[${txnLabel}] postgres COMMIT ok totalMs=${Date.now() - t0} id_pedido=${idPedido}`,
+        );
+        return listadoPostCreacionConCamposNoPersistidos(
+          pedidoOrmToListado(row),
+          input,
+          fotosCrudas.length ? { fotosPublicas } : undefined,
+        );
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.logger.warn(`TX[${txnLabel}] postgres ROLLBACK/fail totalMs=${Date.now() - t0}: ${msg}`);
+      throw e;
+    }
+  }
+
+  async updatePedido(idPedido: string, patch: UpdatePedidoInput): Promise<PedidoListado | null> {
+    const existe = await this.pedidoRead.findPedidoById(idPedido);
+    if (!existe) return null;
+
+    assertGeoPatchCompleto(patch);
+
+    const fotosCrudas = [
+      ...(patch.fotosPaqueteUrls ?? []).map((s) => s.trim()).filter(Boolean),
+      ...(patch.fotosPaqueteBase64 ?? []).map((s) => s.trim()).filter(Boolean),
+    ];
+    if (fotosCrudas.length > 8) {
+      throw new BadRequestException(
+        'Máximo 8 fotos por petición (`fotosPaqueteUrls` + `fotosPaqueteBase64`).',
+      );
+    }
+    if (fotosCrudas.length > 0) {
+      await this.evidencias.resolverFotosPedido(idPedido, fotosCrudas);
+      this.logger.log(`PATCH pedido=${idPedido} evidencias subidas batch=${fotosCrudas.length}`);
+    }
+
+    if (patch.observacionesManifiesto !== undefined) {
+      const t = patch.observacionesManifiesto.trim();
+      if (t) await this.evidencias.guardarManifiestoPedido(idPedido, t);
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const pedidoRepo = manager.getRepository(PedidoOrmEntity);
+      const pedido = await pedidoRepo.findOne({
+        where: { idPedido },
+        relations: ['direccion', 'direccion.tipoVia', 'paquete', 'destinatario'],
+      });
+      if (!pedido) {
+        throw new InternalServerErrorException('Pedido no encontrado dentro de la transacción');
       }
 
-      const row = await pedidoRepo.findOne({
-        where: { idPedido },
-        relations: [...PEDIDO_RELATIONS],
-      });
-      if (!row) {
-        throw new InternalServerErrorException('No se pudo leer el pedido recién creado');
+      if (patch.idEstadoPedido !== undefined) {
+        const est = await manager.getRepository(EstadoPedidoOrmEntity).findOne({
+          where: { idEstadoPedido: patch.idEstadoPedido.trim() },
+        });
+        if (!est) throw new BadRequestException(`Estado no encontrado: ${patch.idEstadoPedido}`);
+        pedido.estadoPedido = est;
       }
-      return pedidoOrmToListado(row);
+
+      if (patch.idUsuarioRecolector !== undefined) {
+        if (patch.idUsuarioRecolector === null) {
+          pedido.usuarioRecolector = null;
+        } else {
+          const u = await manager.getRepository(UsuarioOrmEntity).findOne({
+            where: { idUsuario: patch.idUsuarioRecolector.trim() },
+          });
+          if (!u) {
+            throw new BadRequestException(`Usuario recolector no encontrado: ${patch.idUsuarioRecolector}`);
+          }
+          pedido.usuarioRecolector = u;
+        }
+      }
+
+      if (patch.idUsuarioRepartidor !== undefined) {
+        if (patch.idUsuarioRepartidor === null) {
+          pedido.usuarioRepartidor = null;
+        } else {
+          const u = await manager.getRepository(UsuarioOrmEntity).findOne({
+            where: { idUsuario: patch.idUsuarioRepartidor.trim() },
+          });
+          if (!u) {
+            throw new BadRequestException(`Usuario repartidor no encontrado: ${patch.idUsuarioRepartidor}`);
+          }
+          pedido.usuarioRepartidor = u;
+        }
+      }
+
+      if (patch.idMetodoRecepcion !== undefined) {
+        const met = await manager.getRepository(MetodoRecepcionOrmEntity).findOne({
+          where: { idMetodoRecepcion: patch.idMetodoRecepcion.trim() },
+        });
+        if (!met) {
+          throw new BadRequestException(`Método recepción no encontrado: ${patch.idMetodoRecepcion}`);
+        }
+        pedido.metodoRecepcion = met;
+      }
+
+      if (patch.tipoOperacion !== undefined) {
+        const tp = await resolverTipoPedidoPorOperacion(manager, patch.tipoOperacion);
+        pedido.tipoPedido = tp;
+      }
+
+      let paqueteDirty = false;
+      if (patch.valorDeclarado !== undefined) {
+        const v = Number(patch.valorDeclarado);
+        pedido.valorDeclarado = v;
+        if (pedido.paquete) {
+          pedido.paquete.precio = v;
+          paqueteDirty = true;
+        }
+      }
+      if (patch.precio !== undefined) {
+        pedido.precio = Number(patch.precio);
+      }
+
+      if (patch.fechaEntrega !== undefined) {
+        const m = patch.fechaEntrega.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) throw new BadRequestException('fechaEntrega debe ser YYYY-MM-DD');
+        const y = Number(m[1]);
+        const mo = Number(m[2]);
+        const d = Number(m[3]);
+        pedido.fechaEntrega = new Date(Date.UTC(y, mo - 1, d));
+      }
+
+      if (patch.fragil !== undefined) {
+        pedido.fragil = patch.fragil;
+      }
+
+      if (pedido.destinatario) {
+        let destDirty = false;
+        if (patch.nombreDestinatario !== undefined) {
+          pedido.destinatario.nombre = patch.nombreDestinatario.trim().slice(0, 200);
+          destDirty = true;
+        }
+        if (patch.telefonoDestinatario !== undefined) {
+          pedido.destinatario.telefono = patch.telefonoDestinatario.trim().slice(0, 32);
+          destDirty = true;
+        }
+        if (destDirty) await manager.getRepository(DestinatarioOrmEntity).save(pedido.destinatario);
+      }
+
+      const geoAny = GEO_PATCH_KEYS.some((k) => patch[k] !== undefined);
+      if (geoAny && pedido.direccion) {
+        const tipoVia = await resolverTipoVia(manager, patch.tipoViaNombre!);
+        const { ciudad, departamento, pais } = await cargarGeografiaPorIds(
+          manager,
+          patch.idCiudad!,
+          patch.idDepartamento!,
+          patch.idPais!,
+        );
+        const dir = pedido.direccion;
+        dir.tipoVia = tipoVia;
+        dir.ciudad = ciudad;
+        dir.departamento = departamento;
+        dir.pais = pais;
+        const nombreViaNorm = patch.nombreVia!.trim().slice(0, 120);
+        dir.zona = armarZonaResumida(
+          tipoVia.nombre,
+          nombreViaNorm,
+          patch.numeroPlaca!,
+          patch.numeroSecundario!,
+        );
+        dir.numeroPrincipal = patch.numeroPlaca!.trim().slice(0, 32);
+        dir.numeroSecundario = patch.numeroSecundario!.trim().slice(0, 32);
+        if (patch.observacionesDireccion !== undefined) {
+          dir.observacionesEntrega = patch.observacionesDireccion.trim() || null;
+        }
+        await manager.getRepository(DireccionOrmEntity).save(dir);
+      } else if (patch.observacionesDireccion !== undefined && pedido.direccion) {
+        pedido.direccion.observacionesEntrega = patch.observacionesDireccion.trim() || null;
+        await manager.getRepository(DireccionOrmEntity).save(pedido.direccion);
+      }
+
+      if (pedido.paquete) {
+        if (patch.tipoProductoNombre !== undefined) {
+          pedido.paquete.nombre = patch.tipoProductoNombre.trim().slice(0, 200);
+          paqueteDirty = true;
+        }
+        if (patch.pesoKg !== undefined) {
+          pedido.paquete.peso = patch.pesoKg;
+          paqueteDirty = true;
+        }
+        if (paqueteDirty) await manager.getRepository(PaqueteOrmEntity).save(pedido.paquete);
+      }
+
+      await pedidoRepo.save(pedido);
     });
+
+    return this.pedidoRead.findPedidoById(idPedido);
   }
 }

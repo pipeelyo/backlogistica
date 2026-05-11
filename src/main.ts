@@ -1,12 +1,14 @@
 import './preload';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { Application } from 'express';
 import { AppModule } from './app.module';
+import { HttpRequestLoggingInterceptor } from './common/http-request-logging.interceptor';
 import { setupSwagger } from './swagger/setup-swagger';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  app.useGlobalInterceptors(new HttpRequestLoggingInterceptor());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -24,7 +26,9 @@ async function bootstrap(): Promise<void> {
     res.redirect(301, '/docs');
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = Number(process.env.PORT ?? 3000);
+  await app.listen(port);
+  Logger.log(`HTTP ${port} | cwd=${process.cwd()}`, 'Bootstrap');
 }
 
 void bootstrap();

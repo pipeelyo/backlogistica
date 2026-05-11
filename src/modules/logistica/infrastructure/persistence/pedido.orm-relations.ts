@@ -4,7 +4,6 @@ export const PEDIDO_RELATIONS = [
   'estadoPedido',
   'metodoRecepcion',
   'usuarioSolicitud',
-  'cliente',
   'usuarioRecolector',
   'usuarioRepartidor',
   'paquete',

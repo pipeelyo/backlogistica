@@ -9,4 +9,6 @@ export interface ListPedidosFilter {
 export interface PedidoReadPort {
   listPedidos(filter?: ListPedidosFilter): Promise<PedidoListado[]>;
   findPedidoById(id: string): Promise<PedidoListado | null>;
+  /** `num_guia` único (ej. `BL-20260509-19B426`). */
+  findPedidoByNumGuia(numGuia: string): Promise<PedidoListado | null>;
 }

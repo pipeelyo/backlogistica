@@ -1,4 +1,5 @@
 import type { PedidoListado } from '../../domain/read-models/pedido-listado';
+import type { PedidoTipoOperacion } from '../../domain/pedido-tipo-operacion';
 import type { DireccionOrmEntity } from './direccion.orm-entity';
 import type { PedidoOrmEntity } from './pedido.orm-entity';
 import type { UsuarioOrmEntity } from './usuario.orm-entity';
@@ -7,27 +8,31 @@ function nombreUsuario(u: UsuarioOrmEntity): string {
   return `${u.nombres} ${u.apellidos}`.trim();
 }
 
-/** Texto del solicitante: `cliente.nombre_empresa` si hay fila cliente; si no, nombre del usuario. */
+function inferirTipoOperacionDesdeNombre(nombreTipo: string): PedidoTipoOperacion | null {
+  if (/recolec|recolecta|pickup|retiro|recogida/i.test(nombreTipo)) return 'RECOLECCION';
+  if (/despacho|env[ií]o|entrega|domicilio|delivery/i.test(nombreTipo)) return 'DESPACHO';
+  return null;
+}
+
+/** Texto del solicitante: nombre completo del usuario (`fk_usuario_solicitud`). */
 function etiquetaSolicitante(row: PedidoOrmEntity): string {
-  const empresa = row.cliente?.nombreEmpresa?.trim();
-  if (empresa) return empresa;
   return nombreUsuario(row.usuarioSolicitud);
 }
 
-/** Una sola línea legible para dirección (catálogo + vía + # + observaciones resumidas). */
+/**
+ * Línea legible: ciudad/depto + `zona` (ya incluye tipo vía + identificador + # vía al crear)
+ * + `tipo_via` vía relación si hace falta reforzar el nombre del catálogo.
+ */
 function etiquetaDireccion(d: DireccionOrmEntity): string {
-  const nombreVia = d.nombreVia?.trim() ?? '';
-  const tieneViaDetalle =
-    Boolean(d.tipoVia) &&
-    nombreVia !== '' &&
-    Boolean(d.numeroPrincipal) &&
-    Boolean(d.numeroSecundario);
-  const viaLine = tieneViaDetalle
-    ? `${d.tipoVia!.nombre} ${nombreVia} #${d.numeroPrincipal}-${d.numeroSecundario}`.trim()
-    : d.zona;
   const obs = d.observacionesEntrega?.trim();
   const obsCorta =
     obs && obs.length > 100 ? `${obs.slice(0, 97).replace(/\s+$/, '')}…` : (obs ?? null);
+  const zona = d.zona?.trim() || '';
+  const refTipo = d.tipoVia?.nombre?.trim();
+  const viaLine =
+    refTipo && zona && !zona.toLowerCase().startsWith(refTipo.toLowerCase())
+      ? `${refTipo} · ${zona}`
+      : zona || refTipo || '';
   const partes = [d.ciudad?.nombre, d.departamento?.nombre, viaLine, obsCorta].filter(Boolean);
   return partes.join(', ');
 }
@@ -38,6 +43,7 @@ export function pedidoOrmToListado(row: PedidoOrmEntity): PedidoListado {
     numGuia: row.numGuia,
     creadoEn: row.creadoEn.toISOString(),
     tipoPedido: row.tipoPedido.nombre,
+    tipoOperacion: inferirTipoOperacionDesdeNombre(row.tipoPedido.nombre),
     estadoPedido: row.estadoPedido.nombre,
     metodoRecepcion: row.metodoRecepcion.nombre,
     usuarioSolicitud: etiquetaSolicitante(row),

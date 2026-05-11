@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -12,16 +13,28 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { PEDIDO_TIPO_OPERACION } from '../../../domain/pedido-tipo-operacion';
+import { EJEMPLO_FOTO_PAQUETE_DATA_URL } from '../ejemplo-foto-paquete.data-url';
 
-/** Cuerpo de `POST /pedidos` — sin repetir datos del cliente: se envía solo `idCliente` (tabla `cliente`). */
+/** Cuerpo de `POST /pedidos` — solicitante con rol CLIENTE o ADMIN. */
 export class CreatePedidoBodyDto {
   @ApiProperty({
     format: 'uuid',
+    example: 'b0829465-0779-4366-a29a-6feb6c88cbba',
     description:
-      'Id del registro en tabla `cliente` (empresa + `fk_usuario`). Documento y tipo están en `usuarios`.',
+      '`usuarios.id_usuario` del solicitante; en `usuario_rol` debe tener rol **CLIENTE** o **ADMIN** (`rol.nombre`, sin importar mayúsculas).',
   })
   @IsUUID()
-  idCliente!: string;
+  idUsuario!: string;
+
+  @ApiProperty({
+    enum: PEDIDO_TIPO_OPERACION,
+    description:
+      '**DESPACHO**: entrega al destinatario. **RECOLECCION**: recogida en origen. Debe existir un `tipo_pedido` cuyo nombre encaje (ej. "Despacho", "Recolección").',
+    example: 'DESPACHO',
+  })
+  @IsIn([...PEDIDO_TIPO_OPERACION])
+  tipoOperacion!: (typeof PEDIDO_TIPO_OPERACION)[number];
 
   @ApiProperty({ example: 'María Pérez' })
   @IsString()
@@ -35,13 +48,21 @@ export class CreatePedidoBodyDto {
   @MaxLength(32)
   telefonoDestinatario!: string;
 
-  @ApiProperty({ example: 'Calle', description: 'Debe existir en catálogo `tipo_via` (nombre).' })
+  @ApiProperty({
+    example: 'Calle',
+    description:
+      'Nombre exacto del registro en catálogo **`tipo_via`** (mismo que `GET /catalogo/tipos-via`, ej. Calle, Carrera).',
+  })
   @IsString()
   @MinLength(1)
   @MaxLength(160)
   tipoViaNombre!: string;
 
-  @ApiProperty({ example: '72', description: 'Nombre o número de la vía' })
+  @ApiProperty({
+    example: '72',
+    description:
+      'Identificador de la vía (número/nombre); se compone en `direccion.zona` junto al tipo. El tipo en BD es solo `fk_tipo_via`.',
+  })
   @IsString()
   @MinLength(1)
   @MaxLength(120)
@@ -60,13 +81,30 @@ export class CreatePedidoBodyDto {
   numeroSecundario!: string;
 
   @ApiProperty({
-    example: 'Bogotá',
-    description: 'Nombre de ciudad (coincidencia exacta con el catálogo, sin importar mayúsculas)',
+    format: 'uuid',
+    example: '2539dd69-aee5-4fa7-ab4c-d7838acc89e6',
+    description: '`ciudad.id_ciudad` del catálogo (p. ej. Bogotá).',
   })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(160)
-  ciudadNombre!: string;
+  @IsUUID()
+  idCiudad!: string;
+
+  @ApiProperty({
+    format: 'uuid',
+    example: '89f50dc7-12f4-4c39-b142-0e5bff7841a3',
+    description:
+      '`departamento.id_departamento` para `direccion.fk_departamento` (la tabla `ciudad` no tiene FK al departamento).',
+  })
+  @IsUUID()
+  idDepartamento!: string;
+
+  @ApiProperty({
+    format: 'uuid',
+    example: '4d26c814-c04e-4e53-9929-d42a86a5eafd',
+    description:
+      '`pais.id_pais` para `direccion.fk_pais` (el departamento no tiene FK a país en BD). Ejemplo: Colombia.',
+  })
+  @IsUUID()
+  idPais!: string;
 
   @ApiPropertyOptional({
     example: 'Torre norte, apto 502',
@@ -106,14 +144,20 @@ export class CreatePedidoBodyDto {
   @IsBoolean()
   fragil!: boolean;
 
-  @ApiPropertyOptional({ description: 'Observaciones del manifiesto' })
+  @ApiPropertyOptional({
+    description:
+      'Observaciones del manifiesto (se guardan en Storage como `pedidos/{id}/manifiesto.txt` y aparecen en GET list/detail).',
+    example:
+      'Manipular con cuidado, llamar al recibir al número indicado en la etiqueta. Mercancía frágil.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
   observacionesManifiesto?: string;
 
   @ApiPropertyOptional({
-    description: 'URLs de fotos del paquete (opcional)',
+    description:
+      'URLs `https` de fotos ya alojadas (opcional). Combinado con `fotosPaqueteBase64`, máximo 8 ítems en total.',
     type: [String],
     maxItems: 8,
   })
@@ -123,4 +167,18 @@ export class CreatePedidoBodyDto {
   @IsString({ each: true })
   @MaxLength(2048, { each: true })
   fotosPaqueteUrls?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Fotos en base64 (`data:image/jpeg;base64,...` o similar). Se suben al bucket Supabase **`evidencias`** (`pedidos/{id}/…`). Requiere `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` en el servidor.',
+    type: [String],
+    maxItems: 8,
+    example: [EJEMPLO_FOTO_PAQUETE_DATA_URL],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @IsString({ each: true })
+  @MaxLength(13_500_000, { each: true })
+  fotosPaqueteBase64?: string[];
 }

@@ -1,4 +1,3 @@
-import { ClienteOrmEntity } from './infrastructure/persistence/cliente.orm-entity';
 import { CiudadOrmEntity } from './infrastructure/persistence/ciudad.orm-entity';
 import { DepartamentoOrmEntity } from './infrastructure/persistence/departamento.orm-entity';
 import { DestinatarioOrmEntity } from './infrastructure/persistence/destinatario.orm-entity';
@@ -13,6 +12,7 @@ import { TipoDocumentoOrmEntity } from './infrastructure/persistence/tipo-docume
 import { TipoPedidoOrmEntity } from './infrastructure/persistence/tipo-pedido.orm-entity';
 import { TipoViaOrmEntity } from './infrastructure/persistence/tipo-via.orm-entity';
 import { UsuarioOrmEntity } from './infrastructure/persistence/usuario.orm-entity';
+import { UsuarioRolOrmEntity } from './infrastructure/persistence/usuario-rol.orm-entity';
 
 /** Entidades TypeORM del bounded context logística (infraestructura). */
 export const LOGISTICA_TYPEORM_ENTITIES = [
@@ -26,7 +26,7 @@ export const LOGISTICA_TYPEORM_ENTITIES = [
   CiudadOrmEntity,
   PaqueteOrmEntity,
   UsuarioOrmEntity,
-  ClienteOrmEntity,
+  UsuarioRolOrmEntity,
   DireccionOrmEntity,
   DestinatarioOrmEntity,
   PedidoOrmEntity,

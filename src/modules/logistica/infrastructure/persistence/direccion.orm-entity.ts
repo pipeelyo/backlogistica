@@ -25,12 +25,8 @@ export class DireccionOrmEntity {
   @JoinColumn({ name: 'fk_ciudad' })
   ciudad!: CiudadOrmEntity;
 
-  /** Nombre o número de la vía (ej. 72), tal como en el formulario. */
-  @Column({ name: 'nombre_via', type: 'varchar', length: 120, default: '' })
-  nombreVia!: string;
-
-  /** Observaciones de entrega (apto, oficina, portería…); texto largo. */
-  @Column({ name: 'observaciones_entrega', type: 'text', nullable: true })
+  /** En BD la columna es `observaciones` (apto, oficina, portería…). */
+  @Column({ name: 'observaciones', type: 'text', nullable: true })
   observacionesEntrega!: string | null;
 
   @Column({ type: 'varchar', length: 160 })

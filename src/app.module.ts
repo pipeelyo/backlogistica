@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
@@ -9,7 +10,11 @@ import { LogisticaModule } from './modules/logistica/logistica.module';
 @Module({
   controllers: [AppController],
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      // Rutas explícitas desde cwd (donde ejecutas `nest start` / `node dist/main.js`)
+      envFilePath: [join(process.cwd(), '.env.local'), join(process.cwd(), '.env')],
+    }),
     DatabaseModule,
     HealthModule,
     LogisticaModule,

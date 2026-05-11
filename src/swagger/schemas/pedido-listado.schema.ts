@@ -14,6 +14,14 @@ export class PedidoListadoSchema {
   @ApiProperty({ description: 'Nombre del tipo de pedido' })
   tipoPedido!: string;
 
+  @ApiPropertyOptional({
+    enum: ['DESPACHO', 'RECOLECCION'],
+    nullable: true,
+    description:
+      'Despacho vs recolección inferido del nombre de `tipo_pedido` (vacío si no encaja)',
+  })
+  tipoOperacion!: 'DESPACHO' | 'RECOLECCION' | null;
+
   @ApiProperty({ description: 'Nombre del estado' })
   estadoPedido!: string;
 
@@ -47,7 +55,13 @@ export class PedidoListadoSchema {
   @ApiProperty()
   fragil!: boolean;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Texto del manifiesto (Storage `manifiesto.txt` si lo envió en el POST; `null` si no hay).',
+    example:
+      'Manipular con cuidado, llamar al recibir al número indicado en la etiqueta. Mercancía frágil.',
+  })
   observacionesManifiesto!: string | null;
 
   @ApiPropertyOptional({ type: [String], nullable: true })

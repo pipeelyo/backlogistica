@@ -1,26 +1,88 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Between, QueryFailedError, Repository } from 'typeorm';
 import type { PedidoListado } from '../../domain/read-models/pedido-listado';
 import type { ListPedidosFilter } from '../../domain/ports/pedido-read.port';
 import { PedidoReadPort } from '../../domain/ports/pedido-read.port';
 import { pedidoOrmToListado } from './pedido-listado.mapper';
 import { PEDIDO_RELATIONS } from './pedido.orm-relations';
 import { PedidoOrmEntity } from './pedido.orm-entity';
+import { SupabaseEvidenciasStorage } from '../storage/supabase-evidencias.storage';
 
-/** Inicio y fin (inclusive) del día `YYYY-MM-DD` en UTC para `Between` en `timestamptz`. */
+/** Inicio y fin (inclusive) del día `YYYY-MM-DD` en **UTC** (`creado_en` timestamptz). */
 function rangoDiaUtc(fechaYmd: string): { desde: Date; hasta: Date } {
   const desde = new Date(`${fechaYmd}T00:00:00.000Z`);
   const hasta = new Date(`${fechaYmd}T23:59:59.999Z`);
   return { desde, hasta };
 }
 
+/**
+ * Mismo `YYYY-MM-DD` como **día civil en Colombia** (UTC−5 fijo, sin horario de verano).
+ * Ej.: en Bogotá la noche del 9 aún es “día 9” local mientras en UTC ya es 10 → `?fecha=2026-05-09` vs UTC.
+ */
+function rangoDiaAmericaBogota(fechaYmd: string): { desde: Date; hasta: Date } {
+  const [ys, ms, ds] = fechaYmd.split('-');
+  const y = Number(ys);
+  const m = Number(ms);
+  const d = Number(ds);
+  const desde = new Date(Date.UTC(y, m - 1, d, 5, 0, 0, 0));
+  const hasta = new Date(Date.UTC(y, m - 1, d + 1, 4, 59, 59, 999));
+  return { desde, hasta };
+}
+
+/** Por defecto **America/Bogota**; ponga `LIST_PEDIDOS_FECHA_TZ=UTC` para el filtro solo en UTC. */
+function rangoParaFiltroCreadoEn(fechaYmd: string): { desde: Date; hasta: Date } {
+  const modo = process.env.LIST_PEDIDOS_FECHA_TZ?.trim();
+  if (modo?.toUpperCase() === 'UTC') {
+    return rangoDiaUtc(fechaYmd);
+  }
+  return rangoDiaAmericaBogota(fechaYmd);
+}
+
+async function enriquecerPedidoListadoDesdeStorage(
+  evidencias: SupabaseEvidenciasStorage,
+  row: PedidoOrmEntity,
+  listado: PedidoListado,
+): Promise<PedidoListado> {
+  const [urls, manifiesto] = await Promise.all([
+    evidencias.listarUrlsFotosPedido(row.idPedido),
+    evidencias.leerManifiestoPedido(row.idPedido),
+  ]);
+  return {
+    ...listado,
+    fotosPaqueteUrls:
+      listado.fotosPaqueteUrls && listado.fotosPaqueteUrls.length > 0
+        ? listado.fotosPaqueteUrls
+        : urls.length > 0
+          ? urls
+          : null,
+    observacionesManifiesto: listado.observacionesManifiesto ?? manifiesto ?? null,
+  };
+}
+
 @Injectable()
 export class TypeOrmPedidoReadRepository implements PedidoReadPort {
+  private readonly logger = new Logger(TypeOrmPedidoReadRepository.name);
+
   constructor(
     @InjectRepository(PedidoOrmEntity)
     private readonly repo: Repository<PedidoOrmEntity>,
+    private readonly evidencias: SupabaseEvidenciasStorage,
   ) {}
+
+  private rethrowIfMissingRelation(e: unknown): void {
+    if (e instanceof QueryFailedError) {
+      const driver = e.driverError as { code?: string; message?: string } | undefined;
+      const msg = String(driver?.message ?? e.message ?? '');
+      if (driver?.code === '42P01' && /relation .* does not exist/i.test(msg)) {
+        this.logger.error(`Postgres ${driver.code}: ${msg}`);
+        throw new InternalServerErrorException(
+          `${msg.trim()} — El esquema de esta base no coincide con el ORM (mismo proyecto que DATABASE_URL en .env). ` +
+            'Revise el esquema en el SQL Editor de Supabase (tablas que el ORM espera en `public`, p. ej. `pedidos`, `usuarios`, `usuario_rol`, `rol`).',
+        );
+      }
+    }
+  }
 
   async listPedidos(filter?: ListPedidosFilter): Promise<PedidoListado[]> {
     const base = {
@@ -28,24 +90,73 @@ export class TypeOrmPedidoReadRepository implements PedidoReadPort {
       order: { creadoEn: 'DESC' as const },
     };
 
-    if (filter?.fecha) {
-      const { desde, hasta } = rangoDiaUtc(filter.fecha);
-      const rows = await this.repo.find({
-        ...base,
-        where: { creadoEn: Between(desde, hasta) },
-      });
-      return rows.map(pedidoOrmToListado);
-    }
+    const t0 = Date.now();
+    const tzModo = process.env.LIST_PEDIDOS_FECHA_TZ?.trim().toUpperCase() === 'UTC' ? 'UTC' : 'America/Bogota';
+    const filtroDesc = filter?.fecha ? `fecha=${filter.fecha} tz=${tzModo}` : 'sin filtro fecha';
 
-    const rows = await this.repo.find(base);
-    return rows.map(pedidoOrmToListado);
+    try {
+      if (filter?.fecha) {
+        const { desde, hasta } = rangoParaFiltroCreadoEn(filter.fecha);
+        const rows = await this.repo.find({
+          ...base,
+          where: { creadoEn: Between(desde, hasta) },
+        });
+        const out = await Promise.all(
+          rows.map(async (row) =>
+            enriquecerPedidoListadoDesdeStorage(this.evidencias, row, pedidoOrmToListado(row)),
+          ),
+        );
+        this.logger.log(`listPedidos ${filtroDesc} count=${out.length} ${Date.now() - t0}ms`);
+        return out;
+      }
+
+      const rows = await this.repo.find(base);
+      const out = await Promise.all(
+        rows.map(async (row) =>
+          enriquecerPedidoListadoDesdeStorage(this.evidencias, row, pedidoOrmToListado(row)),
+        ),
+      );
+      this.logger.log(`listPedidos ${filtroDesc} count=${out.length} ${Date.now() - t0}ms`);
+      return out;
+    } catch (e) {
+      this.rethrowIfMissingRelation(e);
+      throw e;
+    }
   }
 
   async findPedidoById(id: string): Promise<PedidoListado | null> {
-    const row = await this.repo.findOne({
-      where: { idPedido: id },
-      relations: [...PEDIDO_RELATIONS],
-    });
-    return row ? pedidoOrmToListado(row) : null;
+    const t0 = Date.now();
+    try {
+      const row = await this.repo.findOne({
+        where: { idPedido: id },
+        relations: [...PEDIDO_RELATIONS],
+      });
+      const hit = Boolean(row);
+      this.logger.log(`findPedidoById id_pedido=${id} hit=${hit} ${Date.now() - t0}ms`);
+      if (!row) return null;
+      return enriquecerPedidoListadoDesdeStorage(this.evidencias, row, pedidoOrmToListado(row));
+    } catch (e) {
+      this.rethrowIfMissingRelation(e);
+      throw e;
+    }
+  }
+
+  async findPedidoByNumGuia(numGuia: string): Promise<PedidoListado | null> {
+    const g = numGuia.trim();
+    const t0 = Date.now();
+    if (!g) return null;
+    try {
+      const row = await this.repo.findOne({
+        where: { numGuia: g },
+        relations: [...PEDIDO_RELATIONS],
+      });
+      const hit = Boolean(row);
+      this.logger.log(`findPedidoByNumGuia num_guia=${g} hit=${hit} ${Date.now() - t0}ms`);
+      if (!row) return null;
+      return enriquecerPedidoListadoDesdeStorage(this.evidencias, row, pedidoOrmToListado(row));
+    } catch (e) {
+      this.rethrowIfMissingRelation(e);
+      throw e;
+    }
   }
 }

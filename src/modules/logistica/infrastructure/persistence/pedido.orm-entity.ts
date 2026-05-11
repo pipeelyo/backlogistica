@@ -1,5 +1,4 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryColumn } from 'typeorm';
-import { ClienteOrmEntity } from './cliente.orm-entity';
 import { DestinatarioOrmEntity } from './destinatario.orm-entity';
 import { DireccionOrmEntity } from './direccion.orm-entity';
 import { EstadoPedidoOrmEntity } from './estado-pedido.orm-entity';
@@ -24,9 +23,19 @@ export class PedidoOrmEntity {
   @JoinColumn({ name: 'fk_usuario_solicitud' })
   usuarioSolicitud!: UsuarioOrmEntity;
 
-  @ManyToOne(() => ClienteOrmEntity, { nullable: true })
-  @JoinColumn({ name: 'fk_cliente' })
-  cliente!: ClienteOrmEntity | null;
+  /**
+   * Legado `cliente`: muchas BD ya no tienen esta columna. `insert`/`update` en false evita
+   * que el INSERT falle con `42703`; si la columna existe y la necesita, quite esos flags.
+   */
+  @Column({
+    name: 'fk_cliente',
+    type: 'uuid',
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
+  fkCliente!: string | null;
 
   @ManyToOne(() => UsuarioOrmEntity, { nullable: true })
   @JoinColumn({ name: 'fk_usuario_recolector' })
@@ -55,16 +64,50 @@ export class PedidoOrmEntity {
   @Column({ name: 'creado_en', type: 'timestamptz' })
   creadoEn!: Date;
 
-  @Column({ name: 'fragil', type: 'boolean', default: false })
+  /** Monto del envío / cobro en `pedidos` (mismo origen que `paquete.precio` si no hay tarifa aparte). */
+  @Column({ name: 'precio', type: 'numeric', precision: 14, scale: 4 })
+  precio!: number;
+
+  /** Valor declarado del contenido (NOT NULL en muchas BD). */
+  @Column({ name: 'valor_declarado', type: 'numeric', precision: 14, scale: 4 })
+  valorDeclarado!: number;
+
+  /** Fecha prevista de entrega (día calendario; al crear se usa el día UTC de `creado_en`). */
+  @Column({ name: 'fecha_entrega', type: 'date' })
+  fechaEntrega!: Date;
+
+  @Column({ name: 'es_fragil', type: 'boolean', default: false })
   fragil!: boolean;
 
-  @Column({ name: 'observaciones_manifiesto', type: 'text', nullable: true })
+  /**
+   * Esquemas sin esta columna en `pedidos`: sin insert/select/update no rompe el SQL.
+   * Si la añade en BD, quite `insert`/`update`/`select` en false para persistir el manifiesto.
+   */
+  @Column({
+    name: 'observaciones_manifiesto',
+    type: 'text',
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
   observacionesManifiesto!: string | null;
 
   @OneToOne(() => DestinatarioOrmEntity, { nullable: true })
   @JoinColumn({ name: 'fk_destinatario' })
   destinatario!: DestinatarioOrmEntity | null;
 
-  @Column({ name: 'fotos_paquete_urls', type: 'jsonb', nullable: true })
+  /**
+   * Tu ERD no incluye esta columna en `pedidos`. Sin DML/select no rompe el SQL.
+   * Si migra `fotos_paquete_urls` (jsonb), quite los `false` para persistir URLs.
+   */
+  @Column({
+    name: 'fotos_paquete_urls',
+    type: 'jsonb',
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
   fotosPaqueteUrls!: string[] | null;
 }
