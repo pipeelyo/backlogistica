@@ -9,9 +9,11 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiBody,
   ApiCreatedResponse,
   ApiNotFoundResponse,
@@ -20,7 +22,9 @@ import {
   ApiParam,
   ApiQuery,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { SupabaseJwtGuard } from '../../../auth/guards/supabase-jwt.guard';
 import { CreatePedidoUseCase } from '../../application/create-pedido.use-case';
 import { GetPedidoByIdUseCase } from '../../application/get-pedido-by-id.use-case';
 import { GetPedidoByNumGuiaUseCase } from '../../application/get-pedido-by-num-guia.use-case';
@@ -32,6 +36,12 @@ import { ListPedidosQueryDto } from './dto/list-pedidos.query.dto';
 import { UpdatePedidoBodyDto } from './dto/update-pedido.body.dto';
 
 @ApiTags('Pedidos')
+@ApiBearerAuth('supabase-jwt')
+@ApiUnauthorizedResponse({
+  description:
+    'Falta `Authorization: Bearer <access_token>` o el JWT de Supabase es inválido/expirado. Obtenga token en POST /auth/login o POST /auth/register.',
+})
+@UseGuards(SupabaseJwtGuard)
 @Controller('pedidos')
 export class PedidosController {
   constructor(

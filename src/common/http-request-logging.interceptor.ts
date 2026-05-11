@@ -1,16 +1,21 @@
 import {
   CallHandler,
   ExecutionContext,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NestInterceptor,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { Observable } from 'rxjs';
-import { finalize } from 'rxjs/operators';
+import { Observable, throwError } from 'rxjs';
+import { catchError, finalize } from 'rxjs/operators';
+
+type RequestWithResolvedStatus = Request & { resolvedHttpStatus?: number };
 
 /**
- * Registra cada petición HTTP al terminar (éxito o error): método, ruta, código y duración.
+ * Registra cada petición HTTP: en error incluye mensaje y stack (Nest Logger → stdout en prod).
+ * Guarda el código HTTP real cuando la cadena falla con HttpException (res.statusCode puede ir tarde).
  */
 @Injectable()
 export class HttpRequestLoggingInterceptor implements NestInterceptor {
@@ -22,17 +27,35 @@ export class HttpRequestLoggingInterceptor implements NestInterceptor {
     }
 
     const http = context.switchToHttp();
-    const req = http.getRequest<Request>();
+    const req = http.getRequest<RequestWithResolvedStatus>();
     const res = http.getResponse<Response>();
     const started = Date.now();
     const method = req.method;
     const path = req.originalUrl ?? req.url;
 
     return next.handle().pipe(
+      catchError((err: unknown) => {
+        let status = HttpStatus.INTERNAL_SERVER_ERROR;
+        if (err instanceof HttpException) {
+          status = err.getStatus();
+        }
+        req.resolvedHttpStatus = status;
+        const msg = err instanceof Error ? err.message : String(err);
+        const stack = err instanceof Error ? err.stack : undefined;
+        this.logger.error(`${method} ${path} → ${status} ${msg}`, stack);
+        return throwError(() => err);
+      }),
       finalize(() => {
         const ms = Date.now() - started;
-        const status = res.statusCode;
-        this.logger.log(`${method} ${path} ${status} ${ms}ms`);
+        const status = req.resolvedHttpStatus ?? res.statusCode;
+        const line = `${method} ${path} ${status} ${ms}ms`;
+        if (status >= 500) {
+          this.logger.error(line);
+        } else if (status >= 400) {
+          this.logger.warn(line);
+        } else {
+          this.logger.log(line);
+        }
       }),
     );
   }

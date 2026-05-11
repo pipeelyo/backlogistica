@@ -1,13 +1,28 @@
 import './preload';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger, LogLevel, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { Application } from 'express';
 import { AppModule } from './app.module';
 import { HttpRequestLoggingInterceptor } from './common/http-request-logging.interceptor';
 import { setupSwagger } from './swagger/setup-swagger';
 
+function resolveLogLevels(): LogLevel[] {
+  const raw = process.env.LOG_LEVELS?.trim();
+  const allowed: LogLevel[] = ['error', 'warn', 'log', 'debug', 'verbose'];
+  if (!raw) {
+    return ['error', 'warn', 'log'];
+  }
+  const parsed = raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s): s is LogLevel => allowed.includes(s as LogLevel));
+  return parsed.length > 0 ? parsed : ['error', 'warn', 'log'];
+}
+
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: resolveLogLevels(),
+  });
   app.useGlobalInterceptors(new HttpRequestLoggingInterceptor());
   app.useGlobalPipes(
     new ValidationPipe({

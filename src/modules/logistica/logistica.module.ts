@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthModule } from '../auth/auth.module';
 import { ListCiudadesUseCase } from './application/list-ciudades.use-case';
 import { ListDepartamentosUseCase } from './application/list-departamentos.use-case';
 import { ListEstadosPedidoUseCase } from './application/list-estados-pedido.use-case';
@@ -28,7 +29,7 @@ import { PedidosController } from './presentation/http/pedidos.controller';
  * Bounded context logística: catálogos, lectura de pedidos y mapa ORM.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([...LOGISTICA_TYPEORM_ENTITIES])],
+  imports: [AuthModule, TypeOrmModule.forFeature([...LOGISTICA_TYPEORM_ENTITIES])],
   controllers: [CatalogoController, PedidosController],
   providers: [
     TypeOrmCatalogReadRepository,

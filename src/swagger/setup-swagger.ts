@@ -10,7 +10,19 @@ export function setupSwagger(app: INestApplication): void {
         'La documentación interactiva está en `/docs`.',
     )
     .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description:
+          'Access token devuelto por **POST /auth/login** o **POST /auth/register** (JWT de Supabase Auth). ' +
+          'Se acepta firma **HS256** (`SUPABASE_JWT_SECRET`) o **JWKS** (`RS256`/`ES256`, misma `SUPABASE_URL`).',
+      },
+      'supabase-jwt',
+    )
     .addTag('Salud', 'Estado del servicio')
+    .addTag('Auth', 'Registro, login y JWT (Supabase Auth)')
     .addTag('Pedidos', 'Consulta de pedidos')
     .addTag('Catálogo', 'Catálogos de apoyo (países, estados, etc.)')
     .addTag('Ejemplos', 'CRUD de ejemplo (hexagonal)')
