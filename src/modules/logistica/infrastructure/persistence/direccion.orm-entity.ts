@@ -29,6 +29,10 @@ export class DireccionOrmEntity {
   @Column({ name: 'observaciones', type: 'text', nullable: true })
   observacionesEntrega!: string | null;
 
+  /**
+   * Número (o alfanumérico) de la vía **antes** del `#` en nomenclatura CO
+   * (p. ej. `2A` en *Calle 2A # 14B-30*). Las placas tras `#` van en `numero_principal` / `numero_secundario`.
+   */
   @Column({ type: 'varchar', length: 160 })
   zona!: string;
 

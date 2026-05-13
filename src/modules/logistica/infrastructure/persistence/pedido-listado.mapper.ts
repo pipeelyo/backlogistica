@@ -1,5 +1,6 @@
 import type { PedidoListado } from '../../domain/read-models/pedido-listado';
 import type { PedidoTipoOperacion } from '../../domain/pedido-tipo-operacion';
+import { lineaNomenclaturaColombiana } from '../../application/direccion-colombiana-texto';
 import type { DireccionOrmEntity } from './direccion.orm-entity';
 import type { PedidoOrmEntity } from './pedido.orm-entity';
 import type { UsuarioOrmEntity } from './usuario.orm-entity';
@@ -19,20 +20,12 @@ function etiquetaSolicitante(row: PedidoOrmEntity): string {
   return nombreUsuario(row.usuarioSolicitud);
 }
 
-/**
- * Línea legible: ciudad/depto + `zona` (ya incluye tipo vía + identificador + # vía al crear)
- * + `tipo_via` vía relación si hace falta reforzar el nombre del catálogo.
- */
+/** Ciudad, depto, línea de nomenclatura CO (`tipo` + `zona` antes de `#` + placas) y observaciones. */
 function etiquetaDireccion(d: DireccionOrmEntity): string {
   const obs = d.observacionesEntrega?.trim();
   const obsCorta =
     obs && obs.length > 100 ? `${obs.slice(0, 97).replace(/\s+$/, '')}…` : (obs ?? null);
-  const zona = d.zona?.trim() || '';
-  const refTipo = d.tipoVia?.nombre?.trim();
-  const viaLine =
-    refTipo && zona && !zona.toLowerCase().startsWith(refTipo.toLowerCase())
-      ? `${refTipo} · ${zona}`
-      : zona || refTipo || '';
+  const viaLine = lineaNomenclaturaColombiana(d);
   const partes = [d.ciudad?.nombre, d.departamento?.nombre, viaLine, obsCorta].filter(Boolean);
   return partes.join(', ');
 }

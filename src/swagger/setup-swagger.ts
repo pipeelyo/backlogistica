@@ -7,7 +7,8 @@ export function setupSwagger(app: INestApplication): void {
     .setDescription(
       'API REST de logística (NestJS, arquitectura hexagonal). ' +
         'Los pedidos devuelven nombres de tablas relacionadas como texto. ' +
-        'La documentación interactiva está en `/docs`.',
+        'La documentación interactiva está en `/docs`. ' +
+        'Cron (cada 5 min en pruebas; ver `asignacion-repartidores.cron.ts`): pedidos en estado **pendiente** (`ASIGNACION_ESTADO_PEDIDO_PENDIENTE_ID`) sin repartidor → asigna `fk_usuario_repartidor` y pasa a **asignado** (`ASIGNACION_ESTADO_PEDIDO_ASIGNADO_ID`). Ver `.env.example`.',
     )
     .setVersion('1.0')
     .addBearerAuth(

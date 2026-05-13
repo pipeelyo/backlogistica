@@ -11,6 +11,7 @@ import { GetPedidoByNumGuiaUseCase } from './application/get-pedido-by-num-guia.
 import { ListPedidosUseCase } from './application/list-pedidos.use-case';
 import { CreatePedidoUseCase } from './application/create-pedido.use-case';
 import { UpdatePedidoUseCase } from './application/update-pedido.use-case';
+import { AsignacionRepartidoresService } from './application/asignacion-repartidores.service';
 import { ListRolesUseCase } from './application/list-roles.use-case';
 import { ListTiposDocumentoUseCase } from './application/list-tipos-documento.use-case';
 import { ListTiposPedidoUseCase } from './application/list-tipos-pedido.use-case';
@@ -22,6 +23,7 @@ import { TypeOrmPedidoWriteRepository } from './infrastructure/persistence/typeo
 import { SupabaseEvidenciasStorage } from './infrastructure/storage/supabase-evidencias.storage';
 import { LOGISTICA_TYPEORM_ENTITIES } from './logistica.persistence.entities';
 import { PEDIDO_READ, PEDIDO_WRITE } from './pedidos.tokens';
+import { AsignacionRepartidoresCron } from './infrastructure/scheduling/asignacion-repartidores.cron';
 import { CatalogoController } from './presentation/http/catalogo.controller';
 import { PedidosController } from './presentation/http/pedidos.controller';
 
@@ -53,6 +55,8 @@ import { PedidosController } from './presentation/http/pedidos.controller';
     GetPedidoByNumGuiaUseCase,
     CreatePedidoUseCase,
     UpdatePedidoUseCase,
+    AsignacionRepartidoresService,
+    AsignacionRepartidoresCron,
   ],
   exports: [TypeOrmModule],
 })
