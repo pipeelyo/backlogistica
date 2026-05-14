@@ -68,8 +68,11 @@ export class PedidosController {
   })
   @ApiOkResponse({ type: PedidoListadoSchema, isArray: true })
   list(@Query() query: ListPedidosQueryDto) {
-    return this.listPedidos.execute(query.fecha ? { fecha: query.fecha } : undefined);
-  }
+  return this.listPedidos.execute({
+    ...(query.fecha     && { fecha:     query.fecha }),
+    ...(query.idUsuario && { idUsuario: query.idUsuario }),
+  });
+}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)

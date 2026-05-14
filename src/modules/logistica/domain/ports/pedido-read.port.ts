@@ -4,6 +4,7 @@ import type { PedidoListado } from '../read-models/pedido-listado';
 export interface ListPedidosFilter {
   /** Día calendario en UTC, formato `YYYY-MM-DD`. */
   fecha?: string;
+  idUsuario?: string;
 }
 
 export interface PedidoReadPort {

@@ -85,44 +85,48 @@ export class TypeOrmPedidoReadRepository implements PedidoReadPort {
   }
 
   async listPedidos(filter?: ListPedidosFilter): Promise<PedidoListado[]> {
-    const base = {
-      relations: [...PEDIDO_RELATIONS],
-      order: { creadoEn: 'DESC' as const },
-    };
+  const base = {
+    relations: [...PEDIDO_RELATIONS],
+    order: { creadoEn: 'DESC' as const },
+  };
 
-    const t0 = Date.now();
-    const tzModo = process.env.LIST_PEDIDOS_FECHA_TZ?.trim().toUpperCase() === 'UTC' ? 'UTC' : 'America/Bogota';
-    const filtroDesc = filter?.fecha ? `fecha=${filter.fecha} tz=${tzModo}` : 'sin filtro fecha';
+  const t0 = Date.now();
+  const tzModo = process.env.LIST_PEDIDOS_FECHA_TZ?.trim().toUpperCase() === 'UTC' ? 'UTC' : 'America/Bogota';
+  const filtroDesc = filter?.fecha ? `fecha=${filter.fecha} tz=${tzModo}` : 'sin filtro fecha';
 
-    try {
-      if (filter?.fecha) {
-        const { desde, hasta } = rangoParaFiltroCreadoEn(filter.fecha);
-        const rows = await this.repo.find({
-          ...base,
-          where: { creadoEn: Between(desde, hasta) },
-        });
-        const out = await Promise.all(
-          rows.map(async (row) =>
-            enriquecerPedidoListadoDesdeStorage(this.evidencias, row, pedidoOrmToListado(row)),
-          ),
-        );
-        this.logger.log(`listPedidos ${filtroDesc} count=${out.length} ${Date.now() - t0}ms`);
-        return out;
-      }
+  const whereBase = filter?.idUsuario
+    ? { usuarioSolicitud: { idUsuario: filter.idUsuario } }
+    : {};
 
-      const rows = await this.repo.find(base);
+  try {
+    if (filter?.fecha) {
+      const { desde, hasta } = rangoParaFiltroCreadoEn(filter.fecha);
+      const rows = await this.repo.find({
+        ...base,
+        where: { ...whereBase, creadoEn: Between(desde, hasta) },
+      });
       const out = await Promise.all(
         rows.map(async (row) =>
           enriquecerPedidoListadoDesdeStorage(this.evidencias, row, pedidoOrmToListado(row)),
         ),
       );
-      this.logger.log(`listPedidos ${filtroDesc} count=${out.length} ${Date.now() - t0}ms`);
+      this.logger.log(`listPedidos ${filtroDesc} idUsuario=${filter?.idUsuario ?? 'todos'} count=${out.length} ${Date.now() - t0}ms`);
       return out;
-    } catch (e) {
-      this.rethrowIfMissingRelation(e);
-      throw e;
     }
+
+    const rows = await this.repo.find({ ...base, where: whereBase });
+    const out = await Promise.all(
+      rows.map(async (row) =>
+        enriquecerPedidoListadoDesdeStorage(this.evidencias, row, pedidoOrmToListado(row)),
+      ),
+    );
+    this.logger.log(`listPedidos ${filtroDesc} idUsuario=${filter?.idUsuario ?? 'todos'} count=${out.length} ${Date.now() - t0}ms`);
+    return out;
+  } catch (e) {
+    this.rethrowIfMissingRelation(e);
+    throw e;
   }
+}
 
   async findPedidoById(id: string): Promise<PedidoListado | null> {
     const t0 = Date.now();
