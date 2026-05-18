@@ -90,7 +90,7 @@ export class AuthService {
   }
 
   private async resolverRol(manager: EntityManager, dto: RegisterDto): Promise<RolOrmEntity> {
-    const id = dto.idRol.trim();
+    const id = dto.idRol;
     const r = await manager.getRepository(RolOrmEntity).findOne({ where: { idRol: id } });
     if (!r) {
       this.logger.warn(`register rechazado: rol no existe id_rol=${id}`);
@@ -151,11 +151,11 @@ export class AuthService {
 
     const correoNorm = dto.correo.trim().toLowerCase();
     this.logger.log(
-      `register inicio correo=${correoNorm} idRol=${dto.idRol.trim()} fkTipoDocumento=${dto.fkTipoDocumento.trim()}`,
+      `register inicio correo=${correoNorm} idRol=${dto.idRol} fkTipoDocumento=${dto.fkTipoDocumento}`,
     );
 
     const tipoDoc = await this.dataSource.manager.getRepository(TipoDocumentoOrmEntity).findOne({
-      where: { idTipoDocumento: dto.fkTipoDocumento.trim() },
+      where: { idTipoDocumento: dto.fkTipoDocumento },
     });
     if (!tipoDoc) {
       this.logger.warn(`register rechazado: tipo de documento no existe fk=${dto.fkTipoDocumento}`);

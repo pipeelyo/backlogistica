@@ -4,7 +4,7 @@ export class Direccion {
     public readonly fkTipoVia: string,
     public readonly fkPais: string,
     public readonly fkDepartamento: string,
-    public readonly fkCiudad: string,
+    public readonly fkCiudad: number,
     public readonly zona: string,
     public readonly numeroPrincipal: string,
     public readonly numeroSecundario: string,

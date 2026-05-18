@@ -1,6 +1,6 @@
 export class TipoDocumento {
   constructor(
-    public readonly idTipoDocumento: string,
+    public readonly idTipoDocumento: number,
     public readonly nombre: string,
     public readonly abreviacion: string,
   ) {}

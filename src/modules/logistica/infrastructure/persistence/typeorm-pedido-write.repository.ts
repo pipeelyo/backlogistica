@@ -9,6 +9,7 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import type { PedidoListado } from '../../domain/read-models/pedido-listado';
+import { parseFechaEntregaYyyyMmDd } from '../../domain/pedido-fecha-entrega';
 import type { PedidoTipoOperacion } from '../../domain/pedido-tipo-operacion';
 import type { PedidoReadPort } from '../../domain/ports/pedido-read.port';
 import type {
@@ -34,6 +35,8 @@ import { TipoViaOrmEntity } from './tipo-via.orm-entity';
 import { UsuarioOrmEntity } from './usuario.orm-entity';
 import { UsuarioRolOrmEntity } from './usuario-rol.orm-entity';
 import { SupabaseEvidenciasStorage } from '../storage/supabase-evidencias.storage';
+import { ESTADO_PEDIDO_CREADO_ID } from '../../logistica-pedido-estados.constants';
+import { ROL_ID_ADMINISTRADOR, ROL_ID_CLIENTE } from '../../logistica-rol.constants';
 
 function generarNumGuia(): string {
   const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -68,10 +71,11 @@ async function cargarGeografiaDireccion(
   manager: EntityManager,
   input: CreatePedidoFormInput,
 ): Promise<{ ciudad: CiudadOrmEntity; departamento: DepartamentoOrmEntity; pais: PaisOrmEntity }> {
-  const idC = input.idCiudad.trim();
-  const ciudad = await manager.getRepository(CiudadOrmEntity).findOne({ where: { idCiudad: idC } });
+  const ciudad = await manager.getRepository(CiudadOrmEntity).findOne({
+    where: { idCiudad: input.idCiudad },
+  });
   if (!ciudad) {
-    throw new BadRequestException(`Ciudad no encontrada por id_ciudad=${idC}`);
+    throw new BadRequestException(`Ciudad no encontrada por id_ciudad=${input.idCiudad}`);
   }
 
   const idDep = input.idDepartamento.trim();
@@ -92,13 +96,12 @@ async function cargarGeografiaDireccion(
 
 async function cargarGeografiaPorIds(
   manager: EntityManager,
-  idCiudad: string,
+  idCiudad: number,
   idDepartamento: string,
   idPais: string,
 ): Promise<{ ciudad: CiudadOrmEntity; departamento: DepartamentoOrmEntity; pais: PaisOrmEntity }> {
-  const idC = idCiudad.trim();
-  const ciudad = await manager.getRepository(CiudadOrmEntity).findOne({ where: { idCiudad: idC } });
-  if (!ciudad) throw new BadRequestException(`Ciudad no encontrada por id_ciudad=${idC}`);
+  const ciudad = await manager.getRepository(CiudadOrmEntity).findOne({ where: { idCiudad } });
+  if (!ciudad) throw new BadRequestException(`Ciudad no encontrada por id_ciudad=${idCiudad}`);
   const idDep = idDepartamento.trim();
   const departamento = await manager.getRepository(DepartamentoOrmEntity).findOne({
     where: { idDepartamento: idDep },
@@ -133,43 +136,48 @@ function assertGeoPatchCompleto(patch: UpdatePedidoInput): void {
   }
 }
 
-async function resolverTipoPedidoPorOperacion(
+async function resolverTipoPedidoPorId(
+  manager: EntityManager,
+  idTipoPedido: number,
+): Promise<TipoPedidoOrmEntity> {
+  const tp = await manager.getRepository(TipoPedidoOrmEntity).findOne({
+    where: { idTipoPedido },
+  });
+  if (!tp) {
+    throw new BadRequestException(
+      `tipo_pedido no encontrado: id_tipo_pedido=${idTipoPedido}. Use GET /catalogo/tipos-pedido.`,
+    );
+  }
+  return tp;
+}
+
+async function resolverMetodoRecepcionPorOperacion(
   manager: EntityManager,
   operacion: PedidoTipoOperacion,
-): Promise<TipoPedidoOrmEntity> {
-  const rows = await manager.getRepository(TipoPedidoOrmEntity).find({ order: { nombre: 'ASC' } });
+): Promise<MetodoRecepcionOrmEntity> {
+  const rows = await manager
+    .getRepository(MetodoRecepcionOrmEntity)
+    .find({ order: { nombre: 'ASC' } });
   if (!rows.length) {
-    throw new BadRequestException('Catálogo tipo_pedido vacío.');
+    throw new BadRequestException('Catálogo metodo_recepcion vacío.');
   }
   const patterns =
     operacion === 'DESPACHO'
-      ? [/despacho/i, /env[ií]o/i, /entrega/i, /domicilio/i, /delivery/i]
-      : [/recolec/i, /recolecta/i, /pickup/i, /retiro/i, /recogida/i];
+      ? [/entrega/i, /domicilio/i, /delivery/i, /despacho/i]
+      : [/recogida/i, /recolec/i, /recolecta/i, /pickup/i, /retiro/i];
   for (const re of patterns) {
     const found = rows.find((r) => re.test(r.nombre));
     if (found) return found;
   }
   const nombres = rows.map((r) => `"${r.nombre}"`).join(', ');
   throw new BadRequestException(
-    `No hay ningún tipo_pedido que encaje con la operación "${operacion}". ` +
-      `Cree filas claras en catálogo (ej. "Despacho" y "Recolección") o ajuste los nombres. Actuales: ${nombres}`,
+    `No hay metodo_recepcion que encaje con "${operacion}". ` +
+      `Cree filas (ej. "Entrega" y "Recogida"). Actuales: ${nombres}`,
   );
 }
 
-async function elegirMetodoRecepcion(manager: EntityManager): Promise<MetodoRecepcionOrmEntity> {
-  const rows = await manager
-    .getRepository(MetodoRecepcionOrmEntity)
-    .find({ order: { nombre: 'ASC' } });
-  if (!rows.length) throw new BadRequestException('Catálogo metodo_recepcion vacío.');
-  return rows.find((r) => /domicilio|entrega|dom/i.test(r.nombre)) ?? rows[0]!;
-}
-
-/** Estado **creado** por defecto (tu catálogo); sobrescribible con `PEDIDO_ESTADO_INICIAL_ID`. */
-const DEFAULT_ID_ESTADO_PEDIDO_CREACION = 'ea973ee7-bb82-423c-b37e-5b6c28b484be';
-
 async function resolverEstadoPedidoCreacion(manager: EntityManager): Promise<EstadoPedidoOrmEntity> {
-  const idEstado =
-    process.env.PEDIDO_ESTADO_INICIAL_ID?.trim() || DEFAULT_ID_ESTADO_PEDIDO_CREACION;
+  const idEstado = process.env.PEDIDO_ESTADO_INICIAL_ID?.trim() || ESTADO_PEDIDO_CREADO_ID;
   const estado = await manager.getRepository(EstadoPedidoOrmEntity).findOne({
     where: { idEstadoPedido: idEstado },
   });
@@ -208,7 +216,7 @@ function listadoPostCreacionConCamposNoPersistidos(
   };
 }
 
-/** Usuario existente con rol **CLIENTE** o **ADMIN** en `usuario_rol` → `rol`. */
+/** Usuario existente con rol **Cliente** o **Administrador** en `usuario_rol` → `rol`. */
 async function cargarUsuarioSolicitanteAutorizado(
   manager: EntityManager,
   idUsuario: string,
@@ -226,9 +234,10 @@ async function cargarUsuarioSolicitanteAutorizado(
     conRolPermitido = await manager
       .getRepository(UsuarioRolOrmEntity)
       .createQueryBuilder('ur')
-      .innerJoin(RolOrmEntity, 'rol', 'rol.id_rol = ur.id_rol')
       .where('ur.id_usuario = :id', { id: idUsuario })
-      .andWhere("(lower(trim(rol.nombre)) = 'cliente' OR lower(trim(rol.nombre)) = 'admin')")
+      .andWhere('ur.id_rol IN (:...ids)', {
+        ids: [ROL_ID_CLIENTE, ROL_ID_ADMINISTRADOR],
+      })
       .getCount();
   } catch (e) {
     if (e instanceof QueryFailedError) {
@@ -245,7 +254,7 @@ async function cargarUsuarioSolicitanteAutorizado(
   }
   if (conRolPermitido === 0) {
     throw new BadRequestException(
-      `El usuario debe tener rol CLIENTE o ADMIN en usuario_rol (id_usuario=${idUsuario}).`,
+      `El usuario debe tener rol Cliente o Administrador en usuario_rol (id_usuario=${idUsuario}).`,
     );
   }
   return usuario;
@@ -265,7 +274,7 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
     const txnLabel = randomBytes(3).toString('hex').toUpperCase();
     const t0 = Date.now();
     this.logger.log(
-      `TX[${txnLabel}] begin crear pedido idUsuario=${input.idUsuario} tipoOperacion=${input.tipoOperacion} idCiudad=${input.idCiudad.trim()} idDepartamento=${input.idDepartamento.trim()} idPais=${input.idPais.trim()}`,
+      `TX[${txnLabel}] begin crear pedido idUsuario=${input.idUsuario} tipoOperacion=${input.tipoOperacion} idCiudad=${input.idCiudad} idDepartamento=${input.idDepartamento.trim()} idPais=${input.idPais.trim()}`,
     );
 
     const idPedido = randomUUID();
@@ -343,8 +352,8 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
         await paqRepo.save(paquete);
         this.logger.log(`TX[${txnLabel}] insert paquete id_paquete=${idPaquete}`);
 
-        const tipoPedido = await resolverTipoPedidoPorOperacion(manager, input.tipoOperacion);
-        const metodo = await elegirMetodoRecepcion(manager);
+        const tipoPedido = await resolverTipoPedidoPorId(manager, input.idTipoPedido);
+        const metodo = await resolverMetodoRecepcionPorOperacion(manager, input.tipoOperacion);
         const estado = await resolverEstadoPedidoCreacion(manager);
 
         const destRepo = manager.getRepository(DestinatarioOrmEntity);
@@ -359,9 +368,12 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
         this.logger.log(`TX[${txnLabel}] insert destinatario id_destinatario=${idDestinatario}`);
 
         const monto = Number(input.valorDeclarado);
-        const fechaEntrega = new Date(
-          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-        );
+        let fechaEntrega: Date;
+        try {
+          fechaEntrega = parseFechaEntregaYyyyMmDd(input.fechaEntrega);
+        } catch {
+          throw new BadRequestException('fechaEntrega debe ser YYYY-MM-DD');
+        }
 
         const pedidoRepo = manager.getRepository(PedidoOrmEntity);
         const pedido = pedidoRepo.create({
@@ -529,9 +541,15 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
         pedido.metodoRecepcion = met;
       }
 
+      if (patch.idTipoPedido !== undefined) {
+        pedido.tipoPedido = await resolverTipoPedidoPorId(manager, patch.idTipoPedido);
+      }
+
       if (patch.tipoOperacion !== undefined) {
-        const tp = await resolverTipoPedidoPorOperacion(manager, patch.tipoOperacion);
-        pedido.tipoPedido = tp;
+        pedido.metodoRecepcion = await resolverMetodoRecepcionPorOperacion(
+          manager,
+          patch.tipoOperacion,
+        );
       }
 
       let paqueteDirty = false;
@@ -548,12 +566,11 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
       }
 
       if (patch.fechaEntrega !== undefined) {
-        const m = patch.fechaEntrega.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (!m) throw new BadRequestException('fechaEntrega debe ser YYYY-MM-DD');
-        const y = Number(m[1]);
-        const mo = Number(m[2]);
-        const d = Number(m[3]);
-        pedido.fechaEntrega = new Date(Date.UTC(y, mo - 1, d));
+        try {
+          pedido.fechaEntrega = parseFechaEntregaYyyyMmDd(patch.fechaEntrega);
+        } catch {
+          throw new BadRequestException('fechaEntrega debe ser YYYY-MM-DD');
+        }
       }
 
       if (patch.fragil !== undefined) {

@@ -2,6 +2,7 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryColumn } from '
 import { DestinatarioOrmEntity } from './destinatario.orm-entity';
 import { DireccionOrmEntity } from './direccion.orm-entity';
 import { EstadoPedidoOrmEntity } from './estado-pedido.orm-entity';
+import { MetodoPagoOrmEntity } from './metodo-pago.orm-entity';
 import { MetodoRecepcionOrmEntity } from './metodo-recepcion.orm-entity';
 import { PaqueteOrmEntity } from './paquete.orm-entity';
 import { TipoPedidoOrmEntity } from './tipo-pedido.orm-entity';
@@ -78,6 +79,16 @@ export class PedidoOrmEntity {
 
   @Column({ name: 'es_fragil', type: 'boolean', default: false })
   fragil!: boolean;
+
+  @Column({ name: 'pagado_por_remitente', type: 'boolean', nullable: true })
+  pagadoPorRemitente!: boolean | null;
+
+  @ManyToOne(() => MetodoPagoOrmEntity, { nullable: true })
+  @JoinColumn({ name: 'fk_metodo_pago' })
+  metodoPago!: MetodoPagoOrmEntity | null;
+
+  @Column({ name: 'valor_recaudado', type: 'numeric', precision: 14, scale: 4, nullable: true })
+  valorRecaudado!: number | null;
 
   /**
    * Esquemas sin esta columna en `pedidos`: sin insert/select/update no rompe el SQL.

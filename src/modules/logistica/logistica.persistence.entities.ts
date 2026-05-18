@@ -3,11 +3,15 @@ import { DepartamentoOrmEntity } from './infrastructure/persistence/departamento
 import { DestinatarioOrmEntity } from './infrastructure/persistence/destinatario.orm-entity';
 import { DireccionOrmEntity } from './infrastructure/persistence/direccion.orm-entity';
 import { EstadoPedidoOrmEntity } from './infrastructure/persistence/estado-pedido.orm-entity';
+import { MetodoPagoOrmEntity } from './infrastructure/persistence/metodo-pago.orm-entity';
 import { MetodoRecepcionOrmEntity } from './infrastructure/persistence/metodo-recepcion.orm-entity';
 import { PaqueteOrmEntity } from './infrastructure/persistence/paquete.orm-entity';
 import { PaisOrmEntity } from './infrastructure/persistence/pais.orm-entity';
 import { PedidoOrmEntity } from './infrastructure/persistence/pedido.orm-entity';
+import { DescripcionSeguimientoOrmEntity } from './infrastructure/persistence/descripcion-seguimiento.orm-entity';
+import { ResultadoEntregaOrmEntity } from './infrastructure/persistence/resultado-entrega.orm-entity';
 import { RolOrmEntity } from './infrastructure/persistence/rol.orm-entity';
+import { SeguimientoOrmEntity } from './infrastructure/persistence/seguimiento.orm-entity';
 import { TipoDocumentoOrmEntity } from './infrastructure/persistence/tipo-documento.orm-entity';
 import { TipoPedidoOrmEntity } from './infrastructure/persistence/tipo-pedido.orm-entity';
 import { TipoViaOrmEntity } from './infrastructure/persistence/tipo-via.orm-entity';
@@ -31,4 +35,8 @@ export const LOGISTICA_TYPEORM_ENTITIES = [
   DestinatarioOrmEntity,
   PedidoOrmEntity,
   RolOrmEntity,
+  SeguimientoOrmEntity,
+  DescripcionSeguimientoOrmEntity,
+  ResultadoEntregaOrmEntity,
+  MetodoPagoOrmEntity,
 ] as const;

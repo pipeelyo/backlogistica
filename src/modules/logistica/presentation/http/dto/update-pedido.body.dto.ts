@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -49,7 +50,20 @@ export class UpdatePedidoBodyDto {
   @IsUUID()
   idMetodoRecepcion?: string;
 
-  @ApiPropertyOptional({ enum: PEDIDO_TIPO_OPERACION })
+  @ApiPropertyOptional({
+    type: 'integer',
+    description: '`tipo_pedido.id_tipo_pedido` (Normal, Express).',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  idTipoPedido?: number;
+
+  @ApiPropertyOptional({
+    enum: PEDIDO_TIPO_OPERACION,
+    description: 'Cambia `metodo_recepcion` (Entrega / Recogida).',
+  })
   @IsOptional()
   @IsIn([...PEDIDO_TIPO_OPERACION])
   tipoOperacion?: (typeof PEDIDO_TIPO_OPERACION)[number];
@@ -95,7 +109,7 @@ export class UpdatePedidoBodyDto {
 
   @ApiPropertyOptional({
     description:
-      'Si cambia dirección, envíe **todos**: tipoViaNombre, nombreVia, numeroPlaca, numeroSecundario, idCiudad, idDepartamento, idPais.',
+      'Si cambia dirección, envíe **todos**: tipoViaNombre, nombreVia (→ `zona`, antes del `#`), numeroPlaca, numeroSecundario, idCiudad, idDepartamento, idPais.',
   })
   @IsOptional()
   @IsString()
@@ -103,31 +117,36 @@ export class UpdatePedidoBodyDto {
   @MaxLength(160)
   tipoViaNombre?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: '2A',
+    description: 'Número de vía antes del `#`; se persiste en `direccion.zona`.',
+  })
   @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(120)
   nombreVia?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '14B', description: 'Placa principal tras el `#` (`numero_principal`)' })
   @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(32)
   numeroPlaca?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '30', description: 'Placa secundaria tras el `#` (`numero_secundario`)' })
   @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(32)
   numeroSecundario?: string;
 
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ type: 'integer', description: '`ciudad.id_ciudad` numérico.' })
   @IsOptional()
-  @IsUUID()
-  idCiudad?: string;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  idCiudad?: number;
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()

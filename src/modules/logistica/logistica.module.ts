@@ -24,15 +24,21 @@ import { SupabaseEvidenciasStorage } from './infrastructure/storage/supabase-evi
 import { LOGISTICA_TYPEORM_ENTITIES } from './logistica.persistence.entities';
 import { PEDIDO_READ, PEDIDO_WRITE } from './pedidos.tokens';
 import { AsignacionRepartidoresCron } from './infrastructure/scheduling/asignacion-repartidores.cron';
+import { ListMetodosPagoUseCase } from './application/list-metodos-pago.use-case';
+import { ListResultadosEntregaUseCase } from './application/list-resultados-entrega.use-case';
+import { ListPedidosRepartidorUseCase } from './application/list-pedidos-repartidor.use-case';
+import { RepartidorAceptarPedidoUseCase } from './application/repartidor-aceptar-pedido.use-case';
+import { RepartidorConfirmarEntregaUseCase } from './application/repartidor-confirmar-entrega.use-case';
 import { CatalogoController } from './presentation/http/catalogo.controller';
 import { PedidosController } from './presentation/http/pedidos.controller';
+import { RepartidorPedidosController } from './presentation/http/repartidor-pedidos.controller';
 
 /**
  * Bounded context logística: catálogos, lectura de pedidos y mapa ORM.
  */
 @Module({
   imports: [AuthModule, TypeOrmModule.forFeature([...LOGISTICA_TYPEORM_ENTITIES])],
-  controllers: [CatalogoController, PedidosController],
+  controllers: [CatalogoController, PedidosController, RepartidorPedidosController],
   providers: [
     TypeOrmCatalogReadRepository,
     { provide: CATALOG_READ, useExisting: TypeOrmCatalogReadRepository },
@@ -55,6 +61,11 @@ import { PedidosController } from './presentation/http/pedidos.controller';
     GetPedidoByNumGuiaUseCase,
     CreatePedidoUseCase,
     UpdatePedidoUseCase,
+    ListResultadosEntregaUseCase,
+    ListMetodosPagoUseCase,
+    ListPedidosRepartidorUseCase,
+    RepartidorAceptarPedidoUseCase,
+    RepartidorConfirmarEntregaUseCase,
     AsignacionRepartidoresService,
     AsignacionRepartidoresCron,
   ],

@@ -8,8 +8,11 @@ import { ListPaisesUseCase } from '../../application/list-paises.use-case';
 import { ListRolesUseCase } from '../../application/list-roles.use-case';
 import { ListTiposDocumentoUseCase } from '../../application/list-tipos-documento.use-case';
 import { ListTiposPedidoUseCase } from '../../application/list-tipos-pedido.use-case';
+import { ListMetodosPagoUseCase } from '../../application/list-metodos-pago.use-case';
+import { ListResultadosEntregaUseCase } from '../../application/list-resultados-entrega.use-case';
 import { ListTiposViaUseCase } from '../../application/list-tipos-via.use-case';
 import { CatalogoFilaSchema } from '../../../../swagger/schemas/catalogo-fila.schema';
+import { ResultadoEntregaCatalogoSchema } from '../../../../swagger/schemas/resultado-entrega.schema';
 
 @ApiTags('Catálogo')
 @Controller('catalogo')
@@ -24,6 +27,8 @@ export class CatalogoController {
     private readonly listMetodosRecepcion: ListMetodosRecepcionUseCase,
     private readonly listTiposDocumento: ListTiposDocumentoUseCase,
     private readonly listTiposVia: ListTiposViaUseCase,
+    private readonly listResultadosEntrega: ListResultadosEntregaUseCase,
+    private readonly listMetodosPago: ListMetodosPagoUseCase,
   ) {}
 
   @Get('paises')
@@ -87,5 +92,29 @@ export class CatalogoController {
   @ApiOkResponse({ type: CatalogoFilaSchema, isArray: true })
   tiposVia() {
     return this.listTiposVia.execute();
+  }
+
+  @Get('resultados-entrega')
+  @ApiOperation({
+    summary: 'Resultados de cierre de entrega (repartidor)',
+    description:
+      'Valores para `idResultadoEntrega` en **POST /repartidor/pedidos/{id}/confirmar-entrega**. ' +
+      'Se persisten en `descripcion_seguimiento.fk_resultado_entrega`.',
+  })
+  @ApiOkResponse({ type: ResultadoEntregaCatalogoSchema, isArray: true })
+  resultadosEntrega() {
+    return this.listResultadosEntrega.execute();
+  }
+
+  @Get('metodos-pago')
+  @ApiOperation({
+    summary: 'Métodos de pago en destino (repartidor)',
+    description:
+      'Catálogo **Efectivo / Transferencia / Datafono** para `idMetodoPago` en **POST /repartidor/pedidos/{id}/confirmar-entrega**. ' +
+      'Se guarda en `pedidos.fk_metodo_pago`. No confundir con `metodo_recepcion` del alta del pedido.',
+  })
+  @ApiOkResponse({ type: ResultadoEntregaCatalogoSchema, isArray: true })
+  metodosPago() {
+    return this.listMetodosPago.execute();
   }
 }

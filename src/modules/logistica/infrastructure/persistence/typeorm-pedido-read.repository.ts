@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, QueryFailedError, Repository } from 'typeorm';
+import { Between, FindOptionsWhere, QueryFailedError, Repository } from 'typeorm';
 import type { PedidoListado } from '../../domain/read-models/pedido-listado';
 import type { ListPedidosFilter } from '../../domain/ports/pedido-read.port';
 import { PedidoReadPort } from '../../domain/ports/pedido-read.port';
@@ -94,9 +94,13 @@ export class TypeOrmPedidoReadRepository implements PedidoReadPort {
   const tzModo = process.env.LIST_PEDIDOS_FECHA_TZ?.trim().toUpperCase() === 'UTC' ? 'UTC' : 'America/Bogota';
   const filtroDesc = filter?.fecha ? `fecha=${filter.fecha} tz=${tzModo}` : 'sin filtro fecha';
 
-  const whereBase = filter?.idUsuario
-    ? { usuarioSolicitud: { idUsuario: filter.idUsuario } }
-    : {};
+  const whereBase: FindOptionsWhere<PedidoOrmEntity> = {};
+  if (filter?.idUsuario) {
+    whereBase.usuarioSolicitud = { idUsuario: filter.idUsuario };
+  }
+  if (filter?.idRepartidor) {
+    whereBase.usuarioRepartidor = { idUsuario: filter.idRepartidor };
+  }
 
   try {
     if (filter?.fecha) {

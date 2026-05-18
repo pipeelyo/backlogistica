@@ -3,11 +3,15 @@ import type { PedidoTipoOperacion } from '../pedido-tipo-operacion';
 
 /**
  * Payload público alineado con el formulario "Nuevo pedido" (app).
- * El solicitante es un **`usuarios.id_usuario`** con rol **CLIENTE** o **ADMIN** en `usuario_rol` → `rol`.
+ * El solicitante es un **`usuarios.id_usuario`** con rol **Cliente** o **Administrador** en `usuario_rol` → `rol`.
  */
 export type CreatePedidoFormInput = {
   idUsuario: string;
-  /** Despacho (entrega) vs recolección; elige `fk_tipo_pedido` según el nombre en catálogo. */
+  /** `tipo_pedido.id_tipo_pedido` (ej. 1=Normal, 2=Express). */
+  idTipoPedido: number;
+  /** Día de entrega programado (`pedidos.fecha_entrega`, `YYYY-MM-DD`). */
+  fechaEntrega: string;
+  /** Despacho (entrega) vs recolección; elige `fk_metodo_recepcion` según el nombre en catálogo. */
   tipoOperacion: PedidoTipoOperacion;
   nombreDestinatario: string;
   telefonoDestinatario: string;
@@ -20,7 +24,7 @@ export type CreatePedidoFormInput = {
   /** Segundo tramo del # (placa secundaria). */
   numeroSecundario: string;
   /** `ciudad.id_ciudad` del catálogo (`direccion.fk_ciudad`). */
-  idCiudad: string;
+  idCiudad: number;
   /** `departamento.id_departamento` (`direccion.fk_departamento`); la tabla `ciudad` no enlaza depto en BD. */
   idDepartamento: string;
   /** `pais.id_pais` (`direccion.fk_pais`); la tabla `departamento` no enlaza país en BD. */
@@ -47,6 +51,7 @@ export type UpdatePedidoInput = {
   idUsuarioRecolector?: string | null;
   idUsuarioRepartidor?: string | null;
   idMetodoRecepcion?: string;
+  idTipoPedido?: number;
   tipoOperacion?: PedidoTipoOperacion;
   valorDeclarado?: number;
   precio?: number;
@@ -59,7 +64,7 @@ export type UpdatePedidoInput = {
   nombreVia?: string;
   numeroPlaca?: string;
   numeroSecundario?: string;
-  idCiudad?: string;
+  idCiudad?: number;
   idDepartamento?: string;
   idPais?: string;
   observacionesDireccion?: string;

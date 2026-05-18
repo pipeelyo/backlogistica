@@ -1,10 +1,10 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 /** Catálogo de ciudad (sin FK a departamento: país/depto van en `direccion`). */
 @Entity({ name: 'ciudad' })
 export class CiudadOrmEntity {
-  @PrimaryColumn({ name: 'id_ciudad', type: 'uuid' })
-  idCiudad!: string;
+  @PrimaryGeneratedColumn({ name: 'id_ciudad' })
+  idCiudad!: number;
 
   @Column({ type: 'varchar', length: 160 })
   nombre!: string;

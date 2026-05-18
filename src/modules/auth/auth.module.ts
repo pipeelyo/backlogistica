@@ -7,6 +7,7 @@ import { UsuarioOrmEntity } from '../logistica/infrastructure/persistence/usuari
 import { UsuarioRolOrmEntity } from '../logistica/infrastructure/persistence/usuario-rol.orm-entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { RepartidorRoleGuard } from './guards/repartidor-role.guard';
 import { SupabaseJwtGuard } from './guards/supabase-jwt.guard';
 
 @Module({
@@ -15,7 +16,7 @@ import { SupabaseJwtGuard } from './guards/supabase-jwt.guard';
     TypeOrmModule.forFeature([UsuarioOrmEntity, UsuarioRolOrmEntity, RolOrmEntity, TipoDocumentoOrmEntity]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, SupabaseJwtGuard],
-  exports: [AuthService, SupabaseJwtGuard],
+  providers: [AuthService, SupabaseJwtGuard, RepartidorRoleGuard],
+  exports: [AuthService, SupabaseJwtGuard, RepartidorRoleGuard],
 })
 export class AuthModule {}

@@ -3,7 +3,7 @@ export class Usuario {
     public readonly idUsuario: string,
     public readonly nombres: string,
     public readonly apellidos: string,
-    public readonly fkTipoDocumento: string,
+    public readonly fkTipoDocumento: number,
     public readonly documento: string,
     public readonly correo: string,
     public readonly telefono: string,

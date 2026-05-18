@@ -1,4 +1,5 @@
 import type { PedidoListado } from '../../domain/read-models/pedido-listado';
+import { formatFechaEntregaYyyyMmDd } from '../../domain/pedido-fecha-entrega';
 import type { PedidoTipoOperacion } from '../../domain/pedido-tipo-operacion';
 import { lineaNomenclaturaColombiana } from '../../application/direccion-colombiana-texto';
 import type { DireccionOrmEntity } from './direccion.orm-entity';
@@ -9,9 +10,9 @@ function nombreUsuario(u: UsuarioOrmEntity): string {
   return `${u.nombres} ${u.apellidos}`.trim();
 }
 
-function inferirTipoOperacionDesdeNombre(nombreTipo: string): PedidoTipoOperacion | null {
-  if (/recolec|recolecta|pickup|retiro|recogida/i.test(nombreTipo)) return 'RECOLECCION';
-  if (/despacho|env[ií]o|entrega|domicilio|delivery/i.test(nombreTipo)) return 'DESPACHO';
+function inferirTipoOperacionDesdeMetodoRecepcion(nombreMetodo: string): PedidoTipoOperacion | null {
+  if (/recogida|recolec|recolecta|pickup|retiro/i.test(nombreMetodo)) return 'RECOLECCION';
+  if (/entrega|domicilio|delivery|despacho/i.test(nombreMetodo)) return 'DESPACHO';
   return null;
 }
 
@@ -36,7 +37,8 @@ export function pedidoOrmToListado(row: PedidoOrmEntity): PedidoListado {
     numGuia: row.numGuia,
     creadoEn: row.creadoEn.toISOString(),
     tipoPedido: row.tipoPedido.nombre,
-    tipoOperacion: inferirTipoOperacionDesdeNombre(row.tipoPedido.nombre),
+    tipoOperacion: inferirTipoOperacionDesdeMetodoRecepcion(row.metodoRecepcion.nombre),
+    fechaEntrega: formatFechaEntregaYyyyMmDd(row.fechaEntrega),
     estadoPedido: row.estadoPedido.nombre,
     metodoRecepcion: row.metodoRecepcion.nombre,
     usuarioSolicitud: etiquetaSolicitante(row),

@@ -16,9 +16,13 @@ function assertFechaUtcValida(fecha: string): void {
 export class ListPedidosUseCase {
   constructor(@Inject(PEDIDO_READ) private readonly pedidos: PedidoReadPort) {}
 
-  execute(filter?: ListPedidosFilter) {
+  async execute(filter?: ListPedidosFilter) {
     if (filter?.fecha) {
       assertFechaUtcValida(filter.fecha);
+    }
+    if (filter?.idPedido) {
+      const one = await this.pedidos.findPedidoById(filter.idPedido);
+      return one ? [one] : [];
     }
     return this.pedidos.listPedidos(filter);
   }

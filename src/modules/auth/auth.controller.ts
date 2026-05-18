@@ -22,6 +22,7 @@ import { RegisterDto } from './dto/register.dto';
 import { SupabaseJwtGuard } from './guards/supabase-jwt.guard';
 import type { SupabaseJwtPayload } from './guards/supabase-jwt.guard';
 import { AuthService } from './auth.service';
+import { SWAGGER_EJEMPLO_CORREO } from '../../swagger/swagger-ejemplos';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -52,7 +53,8 @@ export class AuthController {
   @ApiOperation({
     summary: 'Login',
     description:
-      'Devuelve **access_token** y **refresh_token** de Supabase (JWT HS256). Use `Authorization: Bearer <access_token>` en rutas protegidas.',
+      'Devuelve **access_token** y **refresh_token** de Supabase (JWT HS256). Use `Authorization: Bearer <access_token>` en rutas protegidas. ' +
+      `Ejemplo precargado en Swagger: **${SWAGGER_EJEMPLO_CORREO}** (usuario de prueba).`,
   })
   @ApiBody({ type: LoginDto })
   @ApiUnauthorizedResponse({ description: 'Credenciales incorrectas' })

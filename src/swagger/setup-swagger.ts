@@ -1,14 +1,18 @@
 import type { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SWAGGER_EJEMPLO_CORREO } from './swagger-ejemplos';
 
 export function setupSwagger(app: INestApplication): void {
   const config = new DocumentBuilder()
     .setTitle('Backlogistica API')
     .setDescription(
       'API REST de logística (NestJS, arquitectura hexagonal). ' +
-        'Los pedidos devuelven nombres de tablas relacionadas como texto. ' +
-        'La documentación interactiva está en `/docs`. ' +
-        'Cron (cada 5 min en pruebas; ver `asignacion-repartidores.cron.ts`): pedidos en estado **pendiente** (`ASIGNACION_ESTADO_PEDIDO_PENDIENTE_ID`) sin repartidor → asigna `fk_usuario_repartidor` y pasa a **asignado** (`ASIGNACION_ESTADO_PEDIDO_ASIGNADO_ID`). Ver `.env.example`.',
+        'Pedidos: listado con filtros (`idPedido`, `fecha`, `idUsuario`), **GET /pedidos/{id}** por UUID, **GET /pedidos/guia/{numGuia}**, alta y PATCH. ' +
+        'La dirección en respuestas usa nomenclatura colombiana (`zona` = número antes del `#`; placas en principal/secundario). ' +
+        '**Repartidor** (JWT + rol REPARTIDOR): `GET /repartidor/pedidos` → `POST …/aceptar` (En Camino) → `POST …/confirmar-entrega` (formulario; Entregado si EXITO/NOVEDADES). ' +
+        'Cobro y estado del paquete: body de confirmar-entrega; ver ejemplos en Swagger. ' +
+        'Cron: `ASIGNACION_ESTADOS_PEDIDO_ELEGIBLES` en `.env.example`. ' +
+        `\n\n**Probar:** **POST /auth/login** con \`${SWAGGER_EJEMPLO_CORREO}\` → **Authorize** → tag Repartidor.`,
     )
     .setVersion('1.0')
     .addBearerAuth(
@@ -23,8 +27,18 @@ export function setupSwagger(app: INestApplication): void {
       'supabase-jwt',
     )
     .addTag('Salud', 'Estado del servicio')
-    .addTag('Auth', 'Registro, login y JWT (Supabase Auth)')
-    .addTag('Pedidos', 'Consulta de pedidos')
+    .addTag(
+      'Auth',
+      `Registro, login y JWT. Usuario de ejemplo en Try it out: ${SWAGGER_EJEMPLO_CORREO}`,
+    )
+    .addTag(
+      'Pedidos',
+      'Listar, consultar por **id** (`GET /pedidos/{id}` o `?idPedido=`), por guía, crear y actualizar',
+    )
+    .addTag(
+      'Repartidor',
+      'App del repartidor: mis pedidos · **aceptar** (Asignado→En Camino) · **confirmar-entrega** (cobro, foto, estado paquete, Entregado)',
+    )
     .addTag('Catálogo', 'Catálogos de apoyo (países, estados, etc.)')
     .addTag('Ejemplos', 'CRUD de ejemplo (hexagonal)')
     .build();

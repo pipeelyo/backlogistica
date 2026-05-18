@@ -10,8 +10,10 @@ export interface PedidoListado {
   creadoEn: string;
   /** Nombre del registro en `tipo_pedido` (catálogo). */
   tipoPedido: string;
-  /** Inferido desde `tipoPedido` para la app (`null` si el nombre no encaja con patrones conocidos). */
+  /** Inferido desde `metodoRecepcion` (Entrega / Recogida). */
   tipoOperacion: PedidoTipoOperacion | null;
+  /** `pedidos.fecha_entrega` (`YYYY-MM-DD`). */
+  fechaEntrega: string;
   estadoPedido: string;
   metodoRecepcion: string;
   usuarioSolicitud: string;

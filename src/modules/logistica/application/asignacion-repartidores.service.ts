@@ -3,24 +3,29 @@ import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { getDistance } from 'geolib';
 import { DataSource, In, IsNull } from 'typeorm';
-import { ROL_ID_REPARTIDOR } from '../../auth/auth.constants';
+import { resolveRolIdRepartidor } from '../../auth/auth.constants';
+import {
+  ESTADO_PEDIDO_ASIGNADO_ID,
+  ESTADO_PEDIDO_CREADO_ID,
+  ESTADO_PEDIDO_PENDIENTE_ID,
+} from '../logistica-pedido-estados.constants';
 import { textoDireccionColombianaMapa } from './direccion-colombiana-texto';
 import { nominatimBuscarUnaDireccion } from './nominatim-geocode';
 import { PedidoOrmEntity } from '../infrastructure/persistence/pedido.orm-entity';
 import { UsuarioRolOrmEntity } from '../infrastructure/persistence/usuario-rol.orm-entity';
 
-/** Por defecto: estado «pendiente» (pedidos a asignar repartidor). Override: `ASIGNACION_ESTADO_PEDIDO_PENDIENTE_ID`. */
-export const ASIGNACION_DEFAULT_ESTADO_PENDIENTE_ID = 'd89468bf-71d4-4f8c-b8be-825e65adc76f';
+/** @deprecated Use `ESTADO_PEDIDO_PENDIENTE_ID` */
+export const ASIGNACION_DEFAULT_ESTADO_PENDIENTE_ID = ESTADO_PEDIDO_PENDIENTE_ID;
 
-/** Por defecto: estado «asignado» tras asignar `fk_usuario_repartidor`. Override: `ASIGNACION_ESTADO_PEDIDO_ASIGNADO_ID`. */
-export const ASIGNACION_DEFAULT_ESTADO_ASIGNADO_ID = 'c5604927-4236-4672-abec-e3bbf768123d';
+/** @deprecated Use `ESTADO_PEDIDO_ASIGNADO_ID` */
+export const ASIGNACION_DEFAULT_ESTADO_ASIGNADO_ID = ESTADO_PEDIDO_ASIGNADO_ID;
 
 /** Hub de repartidor: coordenadas GPS y/o ciudad de referencia. */
 export type RepartidorHubConfig = {
   idUsuario: string;
   lat?: number;
   lng?: number;
-  idCiudad?: string;
+  idCiudad?: number;
 };
 
 type LatLng = { lat: number; lng: number };
@@ -63,12 +68,13 @@ function parseHubsJson(raw: string | undefined): RepartidorHubConfig[] {
       if (!idUsuario) continue;
       const lat = typeof o.lat === 'number' ? o.lat : typeof o.latitud === 'number' ? o.latitud : undefined;
       const lng = typeof o.lng === 'number' ? o.lng : typeof o.longitud === 'number' ? o.longitud : undefined;
-      const idCiudad =
-        typeof o.idCiudad === 'string'
-          ? o.idCiudad.trim()
-          : typeof o.fkCiudad === 'string'
-            ? o.fkCiudad.trim()
-            : undefined;
+      const rawCiudad = o.idCiudad ?? o.fkCiudad;
+      let idCiudad: number | undefined;
+      if (typeof rawCiudad === 'number' && Number.isInteger(rawCiudad) && rawCiudad > 0) {
+        idCiudad = rawCiudad;
+      } else if (typeof rawCiudad === 'string' && /^\d+$/.test(rawCiudad.trim())) {
+        idCiudad = Number.parseInt(rawCiudad.trim(), 10);
+      }
       out.push({ idUsuario, lat, lng, idCiudad });
     }
     return out;
@@ -227,37 +233,45 @@ export class AsignacionRepartidoresService {
     return { intentadas: idsSinCoords.length, aciertos };
   }
 
-  private idRolRepartidor(): string {
-    const env = this.config.get<string>('ASIGNACION_ROL_REPARTIDOR_ID')?.trim();
-    if (env && /^[0-9a-f-]{36}$/i.test(env)) {
-      return env;
-    }
-    return ROL_ID_REPARTIDOR;
+  private idRolRepartidor(): number {
+    return resolveRolIdRepartidor((key) => this.config.get<string>(key));
   }
 
   private idEstadoPendiente(): string {
     return parseUuidEnv(
       this.config.get<string>('ASIGNACION_ESTADO_PEDIDO_PENDIENTE_ID'),
-      ASIGNACION_DEFAULT_ESTADO_PENDIENTE_ID,
+      ESTADO_PEDIDO_PENDIENTE_ID,
       'ASIGNACION_ESTADO_PEDIDO_PENDIENTE_ID',
+    );
+  }
+
+  private idEstadoCreado(): string {
+    return parseUuidEnv(
+      this.config.get<string>('PEDIDO_ESTADO_INICIAL_ID'),
+      ESTADO_PEDIDO_CREADO_ID,
+      'PEDIDO_ESTADO_INICIAL_ID',
     );
   }
 
   private idEstadoAsignado(): string {
     return parseUuidEnv(
-      this.config.get<string>('ASIGNACION_ESTADO_PEDIDO_ASIGNADO_ID'),
-      ASIGNACION_DEFAULT_ESTADO_ASIGNADO_ID,
+      this.config.get<string>('ASIGNACION_ESTADO_PEDIDO_ASIGNADO_ID') ??
+        this.config.get<string>('ASIGNACION_DEFAULT_ESTADO_ASIGNADO_ID'),
+      ESTADO_PEDIDO_ASIGNADO_ID,
       'ASIGNACION_ESTADO_PEDIDO_ASIGNADO_ID',
     );
   }
 
   /**
    * Estados desde los que el cron puede asignar repartidor y pasar a **asignado**.
+   * Por defecto: **pendiente** y **creado** (los pedidos nuevos suelen quedar en creado).
    * Override: `ASIGNACION_ESTADOS_PEDIDO_ELEGIBLES` = UUID separados por coma o espacio.
    */
   private idsEstadosElegiblesAsignacion(idPendiente: string): string[] {
     const raw = this.config.get<string>('ASIGNACION_ESTADOS_PEDIDO_ELEGIBLES')?.trim();
-    if (!raw) return [idPendiente];
+    if (!raw) {
+      return [...new Set([idPendiente, this.idEstadoCreado()])];
+    }
     const ids = [
       ...new Set(
         raw
@@ -266,7 +280,7 @@ export class AsignacionRepartidoresService {
           .filter((x) => /^[0-9a-f-]{36}$/i.test(x)),
       ),
     ];
-    return ids.length > 0 ? ids : [idPendiente];
+    return ids.length > 0 ? ids : [...new Set([idPendiente, this.idEstadoCreado()])];
   }
 
   private maxEntregasPorRepartidorDia(): number {
@@ -285,7 +299,7 @@ export class AsignacionRepartidoresService {
   /** Fallback cuando falta GPS en dirección o hub: misma ciudad = 0, otra ciudad con hub = 25, sin datos = 1e6. */
   private distanciaProxySinGps(
     hub: RepartidorHubConfig | undefined,
-    pedidoCiudadId: string,
+    pedidoCiudadId: number,
     destCoords: LatLng | undefined,
     hubCoords: LatLng | undefined,
   ): number {
@@ -311,7 +325,7 @@ export class AsignacionRepartidoresService {
     repId: string,
     hubByRep: Map<string, RepartidorHubConfig>,
     coordsGlobalesDia: LatLng | null,
-    coordsPorCiudadHub: Map<string, LatLng>,
+    coordsPorCiudadHub: Map<number, LatLng>,
   ): LatLng | null {
     const hub = hubByRep.get(repId);
     if (hub?.lat != null && hub?.lng != null && Number.isFinite(hub.lat) && Number.isFinite(hub.lng)) {
@@ -355,7 +369,7 @@ export class AsignacionRepartidoresService {
       .filter((x): x is LatLng => x != null);
     const coordsGlobalesDia = centroid(todosPuntos);
 
-    const coordsPorCiudadHub = new Map<string, LatLng>();
+    const coordsPorCiudadHub = new Map<number, LatLng>();
     for (const h of hubByRep.values()) {
       if (!h.idCiudad || coordsPorCiudadHub.has(h.idCiudad)) continue;
       const pts = lista
@@ -507,7 +521,10 @@ export class AsignacionRepartidoresService {
     });
     const repIds = [...new Set(urs.map((u) => u.idUsuario))];
     if (repIds.length === 0) {
-      this.logger.warn(`No hay usuarios con rol repartidor (id_rol=${idRolRep}).`);
+      this.logger.warn(
+        `No hay usuarios en usuario_rol con id_rol=${idRolRep}. ` +
+          'Revise ASIGNACION_ROL_REPARTIDOR_ID (debe coincidir con rol REPARTIDOR en la tabla rol) y reinicie la API tras cambiar .env.',
+      );
       return { asignados: 0, repartidores: 0, pedidosPendientes: 0, omitidosSinCupo: 0 };
     }
 

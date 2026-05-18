@@ -20,7 +20,6 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
-  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -56,23 +55,19 @@ export class PedidosController {
   @ApiOperation({
     summary: 'Listar pedidos',
     description:
-      'Devuelve pedidos con tipo, estado, método, usuarios, paquete y dirección **solo como nombres** (texto). ' +
-      'Opcional: `?fecha=YYYY-MM-DD` filtra por día de `creado_en` (por defecto **día en Colombia**; ver `LIST_PEDIDOS_FECHA_TZ`).',
-  })
-  @ApiQuery({
-    name: 'fecha',
-    required: false,
-    example: '2026-05-10',
-    description:
-      'Día calendario `YYYY-MM-DD` (por defecto **Colombia**). `LIST_PEDIDOS_FECHA_TZ=UTC` usa solo UTC.',
+      'Devuelve pedidos con tipo, estado, método, usuarios, paquete y dirección en **texto legible** (nomenclatura urbana CO en `direccion`). ' +
+      'Filtros opcionales en query: **`idPedido`** (un solo pedido, 0–1 resultados), **`fecha`** (día de `creado_en`, zona Colombia por defecto), **`idUsuario`** (solicitante). ' +
+      'Para consultar **un pedido por id** con respuesta 404 explícita, prefiera **GET /pedidos/{id}**.',
   })
   @ApiOkResponse({ type: PedidoListadoSchema, isArray: true })
+  @ApiBadRequestResponse({ description: '`fecha` inválida o UUID mal formado en query' })
   list(@Query() query: ListPedidosQueryDto) {
-  return this.listPedidos.execute({
-    ...(query.fecha     && { fecha:     query.fecha }),
-    ...(query.idUsuario && { idUsuario: query.idUsuario }),
-  });
-}
+    return this.listPedidos.execute({
+      ...(query.idPedido && { idPedido: query.idPedido }),
+      ...(query.fecha && !query.idPedido && { fecha: query.fecha }),
+      ...(query.idUsuario && !query.idPedido && { idUsuario: query.idUsuario }),
+    });
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -80,10 +75,11 @@ export class PedidosController {
     summary: 'Crear pedido',
     description:
       'Crea un pedido con el cuerpo del formulario (destinatario, dirección, producto, manifiesto). ' +
-      '**Solicitante:** `idUsuario` (`usuarios.id_usuario`) con rol **CLIENTE** o **ADMIN** vía `usuario_rol` y catálogo `rol`. ' +
-      '**Tipo de operación:** `tipoOperacion` = `DESPACHO` (entrega) o `RECOLECCION` (recogida); se asigna `tipo_pedido` del catálogo por nombre. ' +
-      'El backend genera **`id_pedido`**, **`num_guia`**, **`creado_en`**, asigna **`fk_estado_pedido`** al estado **creado** (`id_estado_pedido` fijo por defecto; opcional `PEDIDO_ESTADO_INICIAL_ID` en entorno), elige tipo/método y resuelve catálogos (tipo vía). **`idCiudad`**, **`idDepartamento`** y **`idPais`** alimentan `direccion` (ciudad sin FK a depto; departamento sin FK a país en BD). ' +
-      'Inserta filas en `direccion`, `paquete`, `destinatario` y `pedidos`. Requiere `idUsuario` (rol CLIENTE o ADMIN), **`idCiudad`**, **`idDepartamento`**, **`idPais`** y catálogos (`tipo_via`, `tipo_pedido`, etc.). ' +
+      '**Solicitante:** `idUsuario` (`usuarios.id_usuario`) con rol **Cliente** o **Administrador** vía `usuario_rol` y catálogo `rol`. ' +
+      '**Modalidad:** `idTipoPedido` (Normal / Express, `GET /catalogo/tipos-pedido`). **Fecha:** `fechaEntrega` (`YYYY-MM-DD` → `pedidos.fecha_entrega`). ' +
+      '**Operación:** `tipoOperacion` = `DESPACHO` o `RECOLECCION` → `metodo_recepcion` (Entrega / Recogida). ' +
+      'El backend genera **`id_pedido`**, **`num_guia`**, **`creado_en`**, asigna **`fk_estado_pedido`** al estado **creado** (`PEDIDO_ESTADO_INICIAL_ID` opcional) y resuelve catálogos (tipo vía). Dirección: **`nombreVia` → `direccion.zona`** (antes del `#`), **`numeroPlaca` / `numeroSecundario`** = placas tras el `#` (p. ej. *Calle 11b # 15-40*). ' +
+      'Inserta filas en `direccion`, `paquete`, `destinatario` y `pedidos`. Requiere `idUsuario` (rol Cliente o Administrador), **`idCiudad`**, **`idDepartamento`**, **`idPais`** y catálogos. ' +
       '**Manifiesto:** `observacionesManifiesto` se devuelve en la respuesta (no hay columna en tu `pedidos`). **Fotos:** `fotosPaqueteUrls` (https) y/o `fotosPaqueteBase64` (máx. 8 en total); base64 se sube al bucket Supabase **`evidencias`** (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`).',
   })
   @ApiBody({ type: CreatePedidoBodyDto })
@@ -109,6 +105,25 @@ export class PedidosController {
     return this.getPedidoByNumGuia.execute(numGuia);
   }
 
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Obtener pedido por id',
+    description:
+      'Devuelve **un** pedido por `pedidos.id_pedido` (UUID). Misma forma que el listado (`PedidoListado`): `idPedido`, `numGuia`, `estadoPedido`, `usuarioRepartidor`, `direccion` con nomenclatura CO, manifiesto y fotos desde Storage si aplica.',
+  })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '7f6ca7e7-c7b0-48ef-94aa-805efeec41b9',
+    description: 'Valor de `pedidos.id_pedido`',
+  })
+  @ApiOkResponse({ type: PedidoListadoSchema })
+  @ApiBadRequestResponse({ description: 'El parámetro `id` no es un UUID válido' })
+  @ApiNotFoundResponse({ description: 'No existe pedido con ese `id_pedido`' })
+  getOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.getPedidoById.execute(id);
+  }
+
   @Patch(':id')
   @ApiOperation({
     summary: 'Actualizar pedido',
@@ -124,14 +139,5 @@ export class PedidosController {
   @ApiNotFoundResponse({ description: 'Pedido no encontrado' })
   patch(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdatePedidoBodyDto) {
     return this.updatePedido.execute(id, body);
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Obtener un pedido por id' })
-  @ApiParam({ name: 'id', format: 'uuid', description: 'id_pedido' })
-  @ApiOkResponse({ type: PedidoListadoSchema })
-  @ApiNotFoundResponse({ description: 'Pedido no encontrado' })
-  getOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.getPedidoById.execute(id);
   }
 }

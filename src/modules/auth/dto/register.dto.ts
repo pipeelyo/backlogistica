@@ -1,38 +1,42 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsInt, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { ROL_ID_CLIENTE, TIPO_DOCUMENTO_ID_REGISTRO } from '../auth.constants';
+import { SWAGGER_EJEMPLO_CORREO, SWAGGER_EJEMPLO_PASSWORD } from '../../../swagger/swagger-ejemplos';
 
 export class RegisterDto {
-  @ApiProperty({ example: 'maria@ejemplo.com' })
+  @ApiProperty({
+    example: SWAGGER_EJEMPLO_CORREO,
+    description: 'Usuario de prueba en Swagger; si ya existe en Auth, use solo **POST /auth/login**.',
+  })
   @IsEmail()
   @MaxLength(254)
   correo!: string;
 
-  @ApiProperty({ example: 'SecretaSegura1', minLength: 8 })
+  @ApiProperty({ example: SWAGGER_EJEMPLO_PASSWORD, minLength: 8 })
   @IsString()
   @MinLength(8)
   @MaxLength(72)
   password!: string;
 
-  @ApiProperty({ example: 'María' })
+  @ApiProperty({ example: 'Juan' })
   @IsString()
   @MinLength(1)
   @MaxLength(120)
   nombres!: string;
 
-  @ApiProperty({ example: 'Pérez' })
+  @ApiProperty({ example: 'García' })
   @IsString()
   @MinLength(1)
   @MaxLength(120)
   apellidos!: string;
 
   @ApiProperty({
-    format: 'uuid',
-    description: '`tipo_documento.id_tipo_documento`',
+    description:
+      '`tipo_documento.id_tipo_documento` (p. ej. 1 = Cédula de ciudadanía). Ver **GET /catalogo/tipos-documento**.',
     example: TIPO_DOCUMENTO_ID_REGISTRO,
   })
-  @IsUUID()
-  fkTipoDocumento!: string;
+  @IsInt()
+  fkTipoDocumento!: number;
 
   @ApiProperty({ example: '1020304050' })
   @IsString()
@@ -47,10 +51,9 @@ export class RegisterDto {
   telefono!: string;
 
   @ApiProperty({
-    format: 'uuid',
-    description: '`rol.id_rol` del usuario en la tabla `rol`.',
+    description: '`rol.id_rol` del usuario en la tabla `rol` (p. ej. 1 = Cliente).',
     example: ROL_ID_CLIENTE,
   })
-  @IsUUID()
-  idRol!: string;
+  @IsInt()
+  idRol!: number;
 }

@@ -17,10 +17,12 @@ export class PedidoListadoSchema {
   @ApiPropertyOptional({
     enum: ['DESPACHO', 'RECOLECCION'],
     nullable: true,
-    description:
-      'Despacho vs recolección inferido del nombre de `tipo_pedido` (vacío si no encaja)',
+    description: 'Despacho vs recolección inferido de `metodo_recepcion`',
   })
   tipoOperacion!: 'DESPACHO' | 'RECOLECCION' | null;
+
+  @ApiProperty({ example: '2026-05-20', description: 'Día programado de entrega' })
+  fechaEntrega!: string;
 
   @ApiProperty({ description: 'Nombre del estado' })
   estadoPedido!: string;
@@ -41,8 +43,9 @@ export class PedidoListadoSchema {
   paquete!: string;
 
   @ApiProperty({
-    description: 'Etiqueta breve de dirección (ciudad, departamento, zona)',
-    example: 'Bogotá, Cundinamarca, Chapinero',
+    description:
+      'Dirección legible: ciudad, departamento y nomenclatura urbana CO (`tipo` + `zona` antes del `#` + placas).',
+    example: 'Bogotá, Bogotá D.C., Calle 11b # 15-40, Torre norte, apto 502',
   })
   direccion!: string;
 

@@ -5,6 +5,10 @@ export interface ListPedidosFilter {
   /** Día calendario en UTC, formato `YYYY-MM-DD`. */
   fecha?: string;
   idUsuario?: string;
+  /** Un solo pedido por `pedidos.id_pedido` (equivale a filtrar el listado a 0 o 1 fila). */
+  idPedido?: string;
+  /** `usuarios.id_usuario` del repartidor (`fk_usuario_repartidor`). */
+  idRepartidor?: string;
 }
 
 export interface PedidoReadPort {

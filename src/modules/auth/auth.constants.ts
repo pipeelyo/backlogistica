@@ -1,11 +1,40 @@
-/**
- * UUID de tu proyecto en `rol` / `tipo_documento` (ej. pruebaLogistica).
- * Ajusta si cambias datos en BD.
- */
-export const ROL_ID_CLIENTE = '717812eb-7811-4055-a189-f939061e0955';
+import {
+  ROL_ID_CLIENTE,
+  ROL_ID_REPARTIDOR,
+} from '../logistica/logistica-rol.constants';
 
-/** `rol.id_rol` para rol REPARTIDOR (asignación nocturna y catálogo). */
-export const ROL_ID_REPARTIDOR = '7504d038-7d60-434e-9fee-8e0633bd11bd';
+export { ROL_ID_CLIENTE, ROL_ID_REPARTIDOR };
+export {
+  ROL_ID_ADMINISTRADOR,
+  ROL_ID_SUPERVISOR,
+  ROL_CODIGO_CLIENTE,
+  ROL_CODIGO_REPARTIDOR,
+  ROL_CODIGO_ADMINISTRADOR,
+  ROL_CODIGO_SUPERVISOR,
+} from '../logistica/logistica-rol.constants';
 
-/** `tipo_documento.id_tipo_documento` que usas en el registro (p. ej. CC). */
-export const TIPO_DOCUMENTO_ID_REGISTRO = 'f0a6caab-ab28-4fc4-ac2a-e18c10c6e429';
+/** Lee `REPARTIDOR_ROL_ID` o `ASIGNACION_ROL_REPARTIDOR_ID`; si no hay entero válido, usa `ROL_ID_REPARTIDOR`. */
+export function resolveRolIdRepartidor(
+  get: (key: string) => string | undefined,
+): number {
+  const fromEnv =
+    get('REPARTIDOR_ROL_ID')?.trim() || get('ASIGNACION_ROL_REPARTIDOR_ID')?.trim();
+  if (fromEnv) {
+    const n = Number.parseInt(fromEnv, 10);
+    if (Number.isInteger(n) && n > 0) {
+      return n;
+    }
+  }
+  return ROL_ID_REPARTIDOR;
+}
+
+export {
+  TIPO_DOCUMENTO_ID_CEDULA as TIPO_DOCUMENTO_ID_REGISTRO,
+  TIPO_DOCUMENTO_ID_CEDULA,
+  TIPO_DOCUMENTO_ID_NIT,
+  TIPO_DOCUMENTO_ID_PASAPORTE,
+  TIPO_DOCUMENTO_ID_CEDULA_EXTRANJERIA,
+  TIPO_DOCUMENTO_ID_TARJETA_IDENTIDAD,
+  TIPO_DOCUMENTO_ID_PEP,
+  TIPO_DOCUMENTO_ID_PPT,
+} from '../logistica/logistica-tipo-documento.constants';

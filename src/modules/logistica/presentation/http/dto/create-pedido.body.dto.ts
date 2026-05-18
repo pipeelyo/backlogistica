@@ -5,32 +5,53 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
 import { PEDIDO_TIPO_OPERACION } from '../../../domain/pedido-tipo-operacion';
+import { TIPO_PEDIDO_ID_NORMAL } from '../../../logistica-tipo-pedido.constants';
 import { EJEMPLO_FOTO_PAQUETE_DATA_URL } from '../ejemplo-foto-paquete.data-url';
 
-/** Cuerpo de `POST /pedidos` — solicitante con rol CLIENTE o ADMIN. */
+/** Cuerpo de `POST /pedidos` — solicitante con rol Cliente o Administrador. */
 export class CreatePedidoBodyDto {
   @ApiProperty({
     format: 'uuid',
     example: 'b0829465-0779-4366-a29a-6feb6c88cbba',
     description:
-      '`usuarios.id_usuario` del solicitante; en `usuario_rol` debe tener rol **CLIENTE** o **ADMIN** (`rol.nombre`, sin importar mayúsculas).',
+      '`usuarios.id_usuario` del solicitante; en `usuario_rol` debe tener rol **Cliente** o **Administrador** (`rol.nombre`, sin importar mayúsculas).',
   })
   @IsUUID()
   idUsuario!: string;
 
   @ApiProperty({
+    type: 'integer',
+    example: TIPO_PEDIDO_ID_NORMAL,
+    description:
+      '`tipo_pedido.id_tipo_pedido` (ej. 1=Normal, 2=Express). Ver **GET /catalogo/tipos-pedido**.',
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  idTipoPedido!: number;
+
+  @ApiProperty({
+    example: '2026-05-20',
+    description: 'Día programado de entrega (`pedidos.fecha_entrega`, formato `YYYY-MM-DD`).',
+  })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'fechaEntrega debe ser YYYY-MM-DD' })
+  fechaEntrega!: string;
+
+  @ApiProperty({
     enum: PEDIDO_TIPO_OPERACION,
     description:
-      '**DESPACHO**: entrega al destinatario. **RECOLECCION**: recogida en origen. Debe existir un `tipo_pedido` cuyo nombre encaje (ej. "Despacho", "Recolección").',
+      '**DESPACHO**: entrega en dirección (`metodo_recepcion` ≈ Entrega). **RECOLECCION**: recogida (`metodo_recepcion` ≈ Recogida).',
     example: 'DESPACHO',
   })
   @IsIn([...PEDIDO_TIPO_OPERACION])
@@ -59,34 +80,36 @@ export class CreatePedidoBodyDto {
   tipoViaNombre!: string;
 
   @ApiProperty({
-    example: '72',
+    example: '11b',
     description:
-      'Identificador de la vía (número/nombre); se compone en `direccion.zona` junto al tipo. El tipo en BD es solo `fk_tipo_via`.',
+      'Número de vía **antes** del `#` en nomenclatura colombiana; se guarda en `direccion.zona` (p. ej. `2A`, `11b`).',
   })
   @IsString()
   @MinLength(1)
   @MaxLength(120)
   nombreVia!: string;
 
-  @ApiProperty({ example: '15', description: 'Primer número del # (placa principal)' })
+  @ApiProperty({ example: '15', description: 'Placa principal **después** del `#` (`direccion.numero_principal`)' })
   @IsString()
   @MinLength(1)
   @MaxLength(32)
   numeroPlaca!: string;
 
-  @ApiProperty({ example: '40', description: 'Segundo número del #' })
+  @ApiProperty({ example: '40', description: 'Placa secundaria **después** del `#` (`direccion.numero_secundario`)' })
   @IsString()
   @MinLength(1)
   @MaxLength(32)
   numeroSecundario!: string;
 
   @ApiProperty({
-    format: 'uuid',
-    example: '2539dd69-aee5-4fa7-ab4c-d7838acc89e6',
-    description: '`ciudad.id_ciudad` del catálogo (p. ej. Bogotá).',
+    type: 'integer',
+    example: 1,
+    description: '`ciudad.id_ciudad` numérico del catálogo (`GET /catalogo/ciudades`).',
   })
-  @IsUUID()
-  idCiudad!: string;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  idCiudad!: number;
 
   @ApiProperty({
     format: 'uuid',

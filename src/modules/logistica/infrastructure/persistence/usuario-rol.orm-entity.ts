@@ -6,6 +6,6 @@ export class UsuarioRolOrmEntity {
   @PrimaryColumn({ name: 'id_usuario', type: 'uuid' })
   idUsuario!: string;
 
-  @PrimaryColumn({ name: 'id_rol', type: 'uuid' })
-  idRol!: string;
+  @PrimaryColumn({ name: 'id_rol', type: 'int' })
+  idRol!: number;
 }

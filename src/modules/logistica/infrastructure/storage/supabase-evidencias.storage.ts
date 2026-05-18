@@ -97,6 +97,30 @@ export class SupabaseEvidenciasStorage implements OnModuleInit {
     }
   }
 
+  /** JSON del formulario de entrega del repartidor (`entrega-formulario.json`). */
+  async guardarFormularioEntrega(idPedido: string, payload: unknown): Promise<void> {
+    const client = this.client;
+    if (!client) return;
+    const path = `pedidos/${idPedido}/entrega-formulario.json`;
+    const body = Buffer.from(JSON.stringify(payload, null, 2), 'utf8');
+    const { error } = await client.storage.from(BUCKET).upload(path, body, {
+      contentType: 'application/json; charset=utf-8',
+      upsert: true,
+    });
+    if (error) {
+      this.logger.warn(`Storage entrega JSON ${path}: ${error.message}`);
+    }
+  }
+
+  /** Sube una foto de evidencia de entrega; devuelve URL pública. */
+  async subirFotoEntrega(idPedido: string, entrada: string): Promise<string> {
+    const urls = await this.resolverFotosPedido(idPedido, [entrada]);
+    if (!urls[0]) {
+      throw new BadRequestException('No se pudo procesar la foto de entrega.');
+    }
+    return urls[0];
+  }
+
   /** Persiste observaciones del manifiesto en Storage (no requiere columna en `pedidos`). */
   async guardarManifiestoPedido(idPedido: string, texto: string): Promise<void> {
     const client = this.client;
