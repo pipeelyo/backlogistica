@@ -16,6 +16,8 @@ import { UsuarioOrmEntity } from '../logistica/infrastructure/persistence/usuari
 import { UsuarioRolOrmEntity } from '../logistica/infrastructure/persistence/usuario-rol.orm-entity';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
+import { VAR } from '../configuracion/variable.keys';
+import { VariablesService } from '../configuracion/variables.service';
 import { createSupabaseAnonClient, createSupabaseServiceClient } from './supabase-clients.factory';
 
 export type AuthProfileDto = {
@@ -42,6 +44,7 @@ export class AuthService {
 
   constructor(
     private readonly config: ConfigService,
+    private readonly variables: VariablesService,
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
@@ -173,8 +176,7 @@ export class AuthService {
     const rol = await this.resolverRol(this.dataSource.manager, dto);
     this.logger.log(`register catálogo ok rol=${rol.nombre} (${rol.idRol})`);
 
-    const emailConfirm =
-      this.config.get<string>('REGISTER_EMAIL_AUTO_CONFIRM', 'true').toLowerCase() !== 'false';
+    const emailConfirm = await this.variables.getBoolean(VAR.REGISTER_EMAIL_AUTO_CONFIRM, true);
 
     this.logger.log(
       `register llamando Supabase admin.createUser correo=${correoNorm} email_confirm=${emailConfirm}`,

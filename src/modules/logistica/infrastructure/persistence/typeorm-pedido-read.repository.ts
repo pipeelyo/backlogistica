@@ -1,4 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { VAR } from '../../../configuracion/variable.keys';
+import { VariablesService } from '../../../configuracion/variables.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, FindOptionsWhere, QueryFailedError, Repository } from 'typeorm';
 import type { PedidoListado } from '../../domain/read-models/pedido-listado';
@@ -30,10 +32,13 @@ function rangoDiaAmericaBogota(fechaYmd: string): { desde: Date; hasta: Date } {
   return { desde, hasta };
 }
 
-/** Por defecto **America/Bogota**; ponga `LIST_PEDIDOS_FECHA_TZ=UTC` para el filtro solo en UTC. */
-function rangoParaFiltroCreadoEn(fechaYmd: string): { desde: Date; hasta: Date } {
-  const modo = process.env.LIST_PEDIDOS_FECHA_TZ?.trim();
-  if (modo?.toUpperCase() === 'UTC') {
+/** Por defecto **America/Bogota**; `LIST_PEDIDOS_FECHA_TZ=UTC` en public.variable para filtro UTC. */
+async function rangoParaFiltroCreadoEn(
+  fechaYmd: string,
+  variables: VariablesService,
+): Promise<{ desde: Date; hasta: Date }> {
+  const modo = (await variables.getText(VAR.LIST_PEDIDOS_FECHA_TZ, 'America/Bogota')).trim();
+  if (modo.toUpperCase() === 'UTC') {
     return rangoDiaUtc(fechaYmd);
   }
   return rangoDiaAmericaBogota(fechaYmd);
@@ -68,6 +73,7 @@ export class TypeOrmPedidoReadRepository implements PedidoReadPort {
     @InjectRepository(PedidoOrmEntity)
     private readonly repo: Repository<PedidoOrmEntity>,
     private readonly evidencias: SupabaseEvidenciasStorage,
+    private readonly variables: VariablesService,
   ) {}
 
   private rethrowIfMissingRelation(e: unknown): void {
@@ -91,7 +97,10 @@ export class TypeOrmPedidoReadRepository implements PedidoReadPort {
   };
 
   const t0 = Date.now();
-  const tzModo = process.env.LIST_PEDIDOS_FECHA_TZ?.trim().toUpperCase() === 'UTC' ? 'UTC' : 'America/Bogota';
+  const tzModo =
+    (await this.variables.getText(VAR.LIST_PEDIDOS_FECHA_TZ, 'America/Bogota')).trim().toUpperCase() === 'UTC'
+      ? 'UTC'
+      : 'America/Bogota';
   const filtroDesc = filter?.fecha ? `fecha=${filter.fecha} tz=${tzModo}` : 'sin filtro fecha';
 
   const whereBase: FindOptionsWhere<PedidoOrmEntity> = {};
@@ -104,7 +113,7 @@ export class TypeOrmPedidoReadRepository implements PedidoReadPort {
 
   try {
     if (filter?.fecha) {
-      const { desde, hasta } = rangoParaFiltroCreadoEn(filter.fecha);
+      const { desde, hasta } = await rangoParaFiltroCreadoEn(filter.fecha, this.variables);
       const rows = await this.repo.find({
         ...base,
         where: { ...whereBase, creadoEn: Between(desde, hasta) },

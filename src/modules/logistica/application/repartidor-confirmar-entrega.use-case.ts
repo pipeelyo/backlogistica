@@ -7,13 +7,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import type { PedidoReadPort } from '../domain/ports/pedido-read.port';
+import { VAR } from '../../configuracion/variable.keys';
+import { VariablesService } from '../../configuracion/variables.service';
 import {
-  ESTADO_PEDIDO_EN_CAMINO_ID,
   ESTADO_PEDIDO_ENTREGADO_ID,
+  ESTADO_PEDIDO_RECIBIDO_REPARTIDOR_ID,
 } from '../logistica-pedido-estados.constants';
 import { PEDIDO_READ } from '../pedidos.tokens';
 import { DescripcionSeguimientoOrmEntity } from '../infrastructure/persistence/descripcion-seguimiento.orm-entity';
@@ -28,16 +29,10 @@ import {
 } from '../domain/repartidor-entrega';
 import type { ConfirmarEntregaRepartidorBodyDto } from '../presentation/http/dto/confirmar-entrega-repartidor.body.dto';
 
-function parseUuidEnv(value: string | undefined, fallback: string): string {
-  const v = value?.trim();
-  if (v && /^[0-9a-f-]{36}$/i.test(v)) return v;
-  return fallback;
-}
-
 @Injectable()
 export class RepartidorConfirmarEntregaUseCase {
   constructor(
-    private readonly config: ConfigService,
+    private readonly variables: VariablesService,
     @Inject(PEDIDO_READ) private readonly pedidos: PedidoReadPort,
     @InjectRepository(PedidoOrmEntity)
     private readonly pedidoRepo: Repository<PedidoOrmEntity>,
@@ -49,18 +44,18 @@ export class RepartidorConfirmarEntregaUseCase {
     private readonly evidencias: SupabaseEvidenciasStorage,
   ) {}
 
-  private idEstadoEnCamino(): string {
-    return parseUuidEnv(
-      this.config.get<string>('REPARTIDOR_PEDIDO_ESTADO_EN_CAMINO_ID'),
-      ESTADO_PEDIDO_EN_CAMINO_ID,
+  private async idEstadoEnCamino(): Promise<number> {
+    return this.variables.getInt(
+      VAR.REPARTIDOR_PEDIDO_ESTADO_EN_CAMINO_ID,
+      ESTADO_PEDIDO_RECIBIDO_REPARTIDOR_ID,
+      { min: 1 },
     );
   }
 
-  private idEstadoEntregado(): string {
-    return parseUuidEnv(
-      this.config.get<string>('REPARTIDOR_PEDIDO_ESTADO_ENTREGADO_ID'),
-      ESTADO_PEDIDO_ENTREGADO_ID,
-    );
+  private async idEstadoEntregado(): Promise<number> {
+    return this.variables.getInt(VAR.REPARTIDOR_PEDIDO_ESTADO_ENTREGADO_ID, ESTADO_PEDIDO_ENTREGADO_ID, {
+      min: 1,
+    });
   }
 
   private async assertTablasSeguimiento(): Promise<void> {
@@ -153,8 +148,8 @@ export class RepartidorConfirmarEntregaUseCase {
 
     this.validarFotos(body, resultado.codigo);
 
-    const idEnCamino = this.idEstadoEnCamino();
-    const idEntregado = this.idEstadoEntregado();
+    const idEnCamino = await this.idEstadoEnCamino();
+    const idEntregado = await this.idEstadoEntregado();
 
     const row = await this.pedidoRepo.findOne({
       where: { idPedido },

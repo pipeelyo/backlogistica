@@ -7,6 +7,7 @@ import { DatabaseModule } from './database/database.module';
 import { ExampleModule } from './modules/example/example.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { ConfiguracionModule } from './modules/configuracion/configuracion.module';
 import { LogisticaModule } from './modules/logistica/logistica.module';
 
 @Module({
@@ -18,6 +19,7 @@ import { LogisticaModule } from './modules/logistica/logistica.module';
       envFilePath: [join(process.cwd(), '.env.local'), join(process.cwd(), '.env')],
     }),
     ScheduleModule.forRoot(),
+    ConfiguracionModule,
     DatabaseModule,
     AuthModule,
     HealthModule,

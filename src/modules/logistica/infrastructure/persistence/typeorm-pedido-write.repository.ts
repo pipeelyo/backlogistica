@@ -35,6 +35,8 @@ import { TipoViaOrmEntity } from './tipo-via.orm-entity';
 import { UsuarioOrmEntity } from './usuario.orm-entity';
 import { UsuarioRolOrmEntity } from './usuario-rol.orm-entity';
 import { SupabaseEvidenciasStorage } from '../storage/supabase-evidencias.storage';
+import { VAR } from '../../../configuracion/variable.keys';
+import { VariablesService } from '../../../configuracion/variables.service';
 import { ESTADO_PEDIDO_CREADO_ID } from '../../logistica-pedido-estados.constants';
 import { ROL_ID_ADMINISTRADOR, ROL_ID_CLIENTE } from '../../logistica-rol.constants';
 
@@ -176,15 +178,20 @@ async function resolverMetodoRecepcionPorOperacion(
   );
 }
 
-async function resolverEstadoPedidoCreacion(manager: EntityManager): Promise<EstadoPedidoOrmEntity> {
-  const idEstado = process.env.PEDIDO_ESTADO_INICIAL_ID?.trim() || ESTADO_PEDIDO_CREADO_ID;
+async function resolverEstadoPedidoCreacion(
+  manager: EntityManager,
+  variables: VariablesService,
+): Promise<EstadoPedidoOrmEntity> {
+  const idEstado = await variables.getInt(VAR.PEDIDO_ESTADO_INICIAL_ID, ESTADO_PEDIDO_CREADO_ID, {
+    min: 1,
+  });
   const estado = await manager.getRepository(EstadoPedidoOrmEntity).findOne({
     where: { idEstadoPedido: idEstado },
   });
   if (!estado) {
     throw new BadRequestException(
       `Estado inicial del pedido no encontrado en catálogo \`estado_pedido\`: id_estado_pedido=${idEstado}. ` +
-        'Verifique el UUID del estado **creado** o defina `PEDIDO_ESTADO_INICIAL_ID` en el entorno.',
+        'Revise PEDIDO_ESTADO_INICIAL_ID en public.variable.',
     );
   }
   return estado;
@@ -267,6 +274,7 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly evidencias: SupabaseEvidenciasStorage,
+    private readonly variables: VariablesService,
     @Inject(PEDIDO_READ) private readonly pedidoRead: PedidoReadPort,
   ) {}
 
@@ -354,7 +362,7 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
 
         const tipoPedido = await resolverTipoPedidoPorId(manager, input.idTipoPedido);
         const metodo = await resolverMetodoRecepcionPorOperacion(manager, input.tipoOperacion);
-        const estado = await resolverEstadoPedidoCreacion(manager);
+        const estado = await resolverEstadoPedidoCreacion(manager, this.variables);
 
         const destRepo = manager.getRepository(DestinatarioOrmEntity);
         const idDestinatario = randomUUID();
@@ -497,7 +505,7 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
 
       if (patch.idEstadoPedido !== undefined) {
         const est = await manager.getRepository(EstadoPedidoOrmEntity).findOne({
-          where: { idEstadoPedido: patch.idEstadoPedido.trim() },
+          where: { idEstadoPedido: patch.idEstadoPedido },
         });
         if (!est) throw new BadRequestException(`Estado no encontrado: ${patch.idEstadoPedido}`);
         pedido.estadoPedido = est;

@@ -85,6 +85,16 @@ export class VariablesService implements OnModuleInit {
     return raw !== undefined && raw !== '' ? raw : defaultValue;
   }
 
+  async getJson<T>(clave: VariableKey, defaultValue: T): Promise<T> {
+    const raw = (await this.getRaw(clave))?.trim();
+    if (!raw) return defaultValue;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return defaultValue;
+    }
+  }
+
   async listAll(): Promise<
     { clave: string; valor: string; tipo: string; descripcion: string | null }[]
   > {

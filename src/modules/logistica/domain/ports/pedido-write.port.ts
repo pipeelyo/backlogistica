@@ -47,7 +47,7 @@ export type CreatePedidoFormInput = {
 
 /** PATCH parcial: solo envíe los campos a cambiar. `null` en recolector/repartidor los desasigna. */
 export type UpdatePedidoInput = {
-  idEstadoPedido?: string;
+  idEstadoPedido?: number;
   idUsuarioRecolector?: string | null;
   idUsuarioRepartidor?: string | null;
   idMetodoRecepcion?: string;

@@ -18,13 +18,11 @@ const logger = new Logger('DatabaseModule');
           );
         }
 
-        const useDirect =
-          config.get<string>('DATABASE_USE_DIRECT_HOST', 'false').toLowerCase() === 'true';
         const usesPooler = url.includes('pooler.supabase.com');
 
         // Comprobar el host directo solo si la cadena NO es del pooler (evita falsos positivos y
         // errores de `new URL()` cuando la contraseña lleva `@` sin codificar).
-        if (!usesPooler && !useDirect) {
+        if (!usesPooler) {
           try {
             const normalized = url.replace(/^postgres:\/\//i, 'postgresql://');
             const parsed = new URL(normalized);
@@ -40,7 +38,6 @@ const logger = new Logger('DatabaseModule');
                   'copia la URI (debe contener …pooler.supabase.com). Sustituye DATABASE_URL en tu .env.',
                   '',
                   'Si la contraseña tiene @ u otros símbolos, codifícala en la URL (ej. @ → %40).',
-                  'Si de verdad tienes IPv6 y quieres el host directo: DATABASE_USE_DIRECT_HOST=true',
                 ].join('\n'),
               );
             }
@@ -50,12 +47,6 @@ const logger = new Logger('DatabaseModule');
             }
             // URL no parseable; TypeORM seguirá con la cadena tal cual
           }
-        }
-
-        if (useDirect && url.includes('db.') && url.includes('.supabase.co')) {
-          logger.warn(
-            'DATABASE_USE_DIRECT_HOST=true: usando host db.*.supabase.co (requiere IPv6 o red compatible).',
-          );
         }
 
         const synchronize = config.get<string>('TYPEORM_SYNC', 'false') === 'true';

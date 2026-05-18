@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
+import { VAR } from '../../../configuracion/variable.keys';
+import { VariablesService } from '../../../configuracion/variables.service';
 import { AsignacionRepartidoresService } from '../../application/asignacion-repartidores.service';
 
 /**
@@ -13,7 +14,7 @@ export class AsignacionRepartidoresCron {
   private readonly logger = new Logger(AsignacionRepartidoresCron.name);
 
   constructor(
-    private readonly config: ConfigService,
+    private readonly variables: VariablesService,
     private readonly asignacion: AsignacionRepartidoresService,
   ) {}
 
@@ -23,9 +24,9 @@ export class AsignacionRepartidoresCron {
     name: 'asignar-repartidores-nocturno',
   })
   async ejecutarNoche(): Promise<void> {
-    const enabled = this.config.get<string>('CRON_ASIGNAR_REPARTIDORES_ENABLED', 'true').toLowerCase() !== 'false';
+    const enabled = await this.variables.getBoolean(VAR.CRON_ASIGNAR_REPARTIDORES_ENABLED, true);
     if (!enabled) {
-      this.logger.log('Cron asignación repartidores omitido (CRON_ASIGNAR_REPARTIDORES_ENABLED=false).');
+      this.logger.log('Cron asignación repartidores omitido (CRON_ASIGNAR_REPARTIDORES_ENABLED=false en variable).');
       return;
     }
     try {

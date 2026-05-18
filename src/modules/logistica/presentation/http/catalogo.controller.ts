@@ -11,6 +11,7 @@ import { ListTiposPedidoUseCase } from '../../application/list-tipos-pedido.use-
 import { ListMetodosPagoUseCase } from '../../application/list-metodos-pago.use-case';
 import { ListResultadosEntregaUseCase } from '../../application/list-resultados-entrega.use-case';
 import { ListTiposViaUseCase } from '../../application/list-tipos-via.use-case';
+import { ListVariablesUseCase } from '../../application/list-variables.use-case';
 import { CatalogoFilaSchema } from '../../../../swagger/schemas/catalogo-fila.schema';
 import { ResultadoEntregaCatalogoSchema } from '../../../../swagger/schemas/resultado-entrega.schema';
 
@@ -29,7 +30,18 @@ export class CatalogoController {
     private readonly listTiposVia: ListTiposViaUseCase,
     private readonly listResultadosEntrega: ListResultadosEntregaUseCase,
     private readonly listMetodosPago: ListMetodosPagoUseCase,
+    private readonly listVariables: ListVariablesUseCase,
   ) {}
+
+  @Get('variables')
+  @ApiOperation({
+    summary: 'Parámetros operativos (tabla variable)',
+    description:
+      'Sustituyen la configuración de negocio que antes iba en `.env` (cron, estados, cupos, etc.).',
+  })
+  variables() {
+    return this.listVariables.execute();
+  }
 
   @Get('paises')
   @ApiOperation({ summary: 'Listar países' })

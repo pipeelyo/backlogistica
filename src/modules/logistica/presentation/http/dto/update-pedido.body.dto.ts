@@ -20,10 +20,12 @@ import { PEDIDO_TIPO_OPERACION } from '../../../domain/pedido-tipo-operacion';
 
 /** PATCH `/pedidos/:id` — solo los campos enviados se actualizan. */
 export class UpdatePedidoBodyDto {
-  @ApiPropertyOptional({ format: 'uuid', description: '`estado_pedido.id_estado_pedido`' })
+  @ApiPropertyOptional({ type: 'integer', description: '`estado_pedido.id_estado_pedido`' })
   @IsOptional()
-  @IsUUID()
-  idEstadoPedido?: string;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  idEstadoPedido?: number;
 
   @ApiPropertyOptional({
     nullable: true,

@@ -11,7 +11,7 @@ export function setupSwagger(app: INestApplication): void {
         'La dirección en respuestas usa nomenclatura colombiana (`zona` = número antes del `#`; placas en principal/secundario). ' +
         '**Repartidor** (JWT + rol REPARTIDOR): `GET /repartidor/pedidos` → `POST …/aceptar` (En Camino) → `POST …/confirmar-entrega` (formulario; Entregado si EXITO/NOVEDADES). ' +
         'Cobro y estado del paquete: body de confirmar-entrega; ver ejemplos en Swagger. ' +
-        'Cron: `ASIGNACION_ESTADOS_PEDIDO_ELEGIBLES` en `.env.example`. ' +
+        'Parámetros operativos (cron, estados, cupos): tabla `public.variable` — **GET /catalogo/variables**. ' +
         `\n\n**Probar:** **POST /auth/login** con \`${SWAGGER_EJEMPLO_CORREO}\` → **Authorize** → tag Repartidor.`,
     )
     .setVersion('1.0')

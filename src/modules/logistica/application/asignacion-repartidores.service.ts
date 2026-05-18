@@ -1,21 +1,18 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { getDistance } from 'geolib';
 import { DataSource, In, IsNull } from 'typeorm';
-import { resolveRolIdRepartidor } from '../../auth/auth.constants';
+import { VAR } from '../../configuracion/variable.keys';
+import { VariablesService } from '../../configuracion/variables.service';
+import { ROL_ID_REPARTIDOR } from '../logistica-rol.constants';
 import {
   ESTADO_PEDIDO_ASIGNADO_ID,
   ESTADO_PEDIDO_CREADO_ID,
-  ESTADO_PEDIDO_PENDIENTE_ID,
 } from '../logistica-pedido-estados.constants';
 import { textoDireccionColombianaMapa } from './direccion-colombiana-texto';
 import { nominatimBuscarUnaDireccion } from './nominatim-geocode';
 import { PedidoOrmEntity } from '../infrastructure/persistence/pedido.orm-entity';
 import { UsuarioRolOrmEntity } from '../infrastructure/persistence/usuario-rol.orm-entity';
-
-/** @deprecated Use `ESTADO_PEDIDO_PENDIENTE_ID` */
-export const ASIGNACION_DEFAULT_ESTADO_PENDIENTE_ID = ESTADO_PEDIDO_PENDIENTE_ID;
 
 /** @deprecated Use `ESTADO_PEDIDO_ASIGNADO_ID` */
 export const ASIGNACION_DEFAULT_ESTADO_ASIGNADO_ID = ESTADO_PEDIDO_ASIGNADO_ID;
@@ -83,19 +80,6 @@ function parseHubsJson(raw: string | undefined): RepartidorHubConfig[] {
   }
 }
 
-function parseUuidEnv(
-  value: string | undefined,
-  fallback: string,
-  label: string,
-): string {
-  const v = value?.trim();
-  if (!v) return fallback;
-  if (!/^[0-9a-f-]{36}$/i.test(v)) {
-    throw new BadRequestException(`${label} debe ser un UUID válido.`);
-  }
-  return v;
-}
-
 /** Orden de visita greedy (nearest neighbor) desde `inicio`; devuelve orden de índices y km acumulados en línea recta. */
 function rutaNearestNeighborKm(inicio: LatLng, paradas: LatLng[]): { orden: number[]; kmTotal: number } {
   if (paradas.length === 0) {
@@ -135,8 +119,7 @@ function rutaNearestNeighborKm(inicio: LatLng, paradas: LatLng[]): { orden: numb
  * (p. ej. *Calle 2A # 14B-30*). Si no hay `latitud`/`longitud` en BD, opcionalmente `ASIGNACION_GEOCODING_NOMINATIM` consulta OSM Nominatim
  * (solo en memoria en esa corrida; respeta ~1 req/s) para afinar km y orden NN. Si no, se avisa en log con `textoDireccionColombianaMapa`.
  *
- * **Estados elegibles:** por defecto solo **pendiente** (`ASIGNACION_ESTADO_PEDIDO_PENDIENTE_ID`). Si los pedidos nacen en **creado** y deben entrar al cron,
- * defina `ASIGNACION_ESTADOS_PEDIDO_ELEGIBLES` con los UUID separados por coma (p. ej. pendiente y el de `PEDIDO_ESTADO_INICIAL_ID`).
+ * **Estados elegibles:** `ASIGNACION_ESTADOS_PEDIDO_ELEGIBLES` en `public.variable` (por defecto **Creado**).
  */
 @Injectable()
 export class AsignacionRepartidoresService {
@@ -144,7 +127,7 @@ export class AsignacionRepartidoresService {
   private coordsColumnsCache: boolean | null = null;
 
   constructor(
-    private readonly config: ConfigService,
+    private readonly variables: VariablesService,
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
@@ -186,14 +169,14 @@ export class AsignacionRepartidoresService {
     pedidos: PedidoOrmEntity[],
     coordsPorDireccion: Map<string, LatLng>,
   ): Promise<{ intentadas: number; aciertos: number }> {
-    const raw = (this.config.get<string>('ASIGNACION_GEOCODING_NOMINATIM') ?? '').toLowerCase().trim();
-    if (!['true', '1', 'yes'].includes(raw)) {
+    const geocoding = await this.variables.getBoolean(VAR.ASIGNACION_GEOCODING_NOMINATIM, false);
+    if (!geocoding) {
       return { intentadas: 0, aciertos: 0 };
     }
-    const email = this.config.get<string>('ASIGNACION_NOMINATIM_CONTACT_EMAIL')?.trim();
+    const email = (await this.variables.getRaw(VAR.ASIGNACION_NOMINATIM_CONTACT_EMAIL))?.trim();
     if (!email?.includes('@')) {
       this.logger.warn(
-        'ASIGNACION_GEOCODING_NOMINATIM activo pero falta ASIGNACION_NOMINATIM_CONTACT_EMAIL válido; no se geocodifica.',
+        'ASIGNACION_GEOCODING_NOMINATIM activo pero falta ASIGNACION_NOMINATIM_CONTACT_EMAIL en public.variable; no se geocodifica.',
       );
       return { intentadas: 0, aciertos: 0 };
     }
@@ -233,67 +216,31 @@ export class AsignacionRepartidoresService {
     return { intentadas: idsSinCoords.length, aciertos };
   }
 
-  private idRolRepartidor(): number {
-    return resolveRolIdRepartidor((key) => this.config.get<string>(key));
+  private async idRolRepartidor(): Promise<number> {
+    return this.variables.getInt(VAR.ASIGNACION_ROL_REPARTIDOR_ID, ROL_ID_REPARTIDOR, { min: 1 });
   }
 
-  private idEstadoPendiente(): string {
-    return parseUuidEnv(
-      this.config.get<string>('ASIGNACION_ESTADO_PEDIDO_PENDIENTE_ID'),
-      ESTADO_PEDIDO_PENDIENTE_ID,
-      'ASIGNACION_ESTADO_PEDIDO_PENDIENTE_ID',
-    );
+  private async idEstadoAsignado(): Promise<number> {
+    return this.variables.getInt(VAR.ASIGNACION_ESTADO_PEDIDO_ASIGNADO_ID, ESTADO_PEDIDO_ASIGNADO_ID, {
+      min: 1,
+    });
   }
 
-  private idEstadoCreado(): string {
-    return parseUuidEnv(
-      this.config.get<string>('PEDIDO_ESTADO_INICIAL_ID'),
-      ESTADO_PEDIDO_CREADO_ID,
-      'PEDIDO_ESTADO_INICIAL_ID',
-    );
+  /** Estados desde los que el cron puede asignar repartidor y pasar a **asignado**. */
+  private async idsEstadosElegiblesAsignacion(): Promise<number[]> {
+    return this.variables.getIntList(VAR.ASIGNACION_ESTADOS_PEDIDO_ELEGIBLES, [ESTADO_PEDIDO_CREADO_ID]);
   }
 
-  private idEstadoAsignado(): string {
-    return parseUuidEnv(
-      this.config.get<string>('ASIGNACION_ESTADO_PEDIDO_ASIGNADO_ID') ??
-        this.config.get<string>('ASIGNACION_DEFAULT_ESTADO_ASIGNADO_ID'),
-      ESTADO_PEDIDO_ASIGNADO_ID,
-      'ASIGNACION_ESTADO_PEDIDO_ASIGNADO_ID',
-    );
+  private async maxEntregasPorRepartidorDia(): Promise<number> {
+    return this.variables.getInt(VAR.ASIGNACION_MAX_ENTREGAS_POR_REPARTIDOR_DIA, 5, {
+      min: 1,
+      max: 500,
+    });
   }
 
-  /**
-   * Estados desde los que el cron puede asignar repartidor y pasar a **asignado**.
-   * Por defecto: **pendiente** y **creado** (los pedidos nuevos suelen quedar en creado).
-   * Override: `ASIGNACION_ESTADOS_PEDIDO_ELEGIBLES` = UUID separados por coma o espacio.
-   */
-  private idsEstadosElegiblesAsignacion(idPendiente: string): string[] {
-    const raw = this.config.get<string>('ASIGNACION_ESTADOS_PEDIDO_ELEGIBLES')?.trim();
-    if (!raw) {
-      return [...new Set([idPendiente, this.idEstadoCreado()])];
-    }
-    const ids = [
-      ...new Set(
-        raw
-          .split(/[,;\s]+/)
-          .map((x) => x.trim())
-          .filter((x) => /^[0-9a-f-]{36}$/i.test(x)),
-      ),
-    ];
-    return ids.length > 0 ? ids : [...new Set([idPendiente, this.idEstadoCreado()])];
-  }
-
-  private maxEntregasPorRepartidorDia(): number {
-    const raw = this.config.get<string>('ASIGNACION_MAX_ENTREGAS_POR_REPARTIDOR_DIA')?.trim();
-    if (raw && /^\d+$/.test(raw)) {
-      const n = Number(raw);
-      if (n >= 1 && n <= 500) return n;
-    }
-    return 5;
-  }
-
-  private hubs(): RepartidorHubConfig[] {
-    return parseHubsJson(this.config.get<string>('ASIGNACION_REPARTIDORES_HUBS'));
+  private async hubs(): Promise<RepartidorHubConfig[]> {
+    const raw = await this.variables.getJson<unknown>(VAR.ASIGNACION_REPARTIDORES_HUBS, []);
+    return parseHubsJson(typeof raw === 'string' ? raw : JSON.stringify(raw ?? []));
   }
 
   /** Fallback cuando falta GPS en dirección o hub: misma ciudad = 0, otra ciudad con hub = 25, sin datos = 1e6. */
@@ -349,8 +296,8 @@ export class AsignacionRepartidoresService {
     coordsPorDireccion: Map<string, LatLng>;
     cargaPorRepDia: Map<string, number>;
     maxPorDia: number;
-    idsEstadosElegibles: string[];
-    idAsignado: string;
+    idsEstadosElegibles: number[];
+    idAsignado: number;
   }): Promise<{ asignados: number; omitidosSinCupo: number }> {
     const {
       dia,
@@ -508,13 +455,12 @@ export class AsignacionRepartidoresService {
     pedidosPendientes: number;
     omitidosSinCupo: number;
   }> {
-    const idPendiente = this.idEstadoPendiente();
-    const idAsignado = this.idEstadoAsignado();
-    const idsEstadosElegibles = this.idsEstadosElegiblesAsignacion(idPendiente);
-    const hubs = this.hubs();
+    const idAsignado = await this.idEstadoAsignado();
+    const idsEstadosElegibles = await this.idsEstadosElegiblesAsignacion();
+    const hubs = await this.hubs();
     const hubByRep = new Map(hubs.map((h) => [h.idUsuario, h]));
 
-    const idRolRep = this.idRolRepartidor();
+    const idRolRep = await this.idRolRepartidor();
 
     const urs = await this.dataSource.getRepository(UsuarioRolOrmEntity).find({
       where: { idRol: idRolRep },
@@ -523,7 +469,7 @@ export class AsignacionRepartidoresService {
     if (repIds.length === 0) {
       this.logger.warn(
         `No hay usuarios en usuario_rol con id_rol=${idRolRep}. ` +
-          'Revise ASIGNACION_ROL_REPARTIDOR_ID (debe coincidir con rol REPARTIDOR en la tabla rol) y reinicie la API tras cambiar .env.',
+          'Revise ASIGNACION_ROL_REPARTIDOR_ID en public.variable (debe coincidir con rol REPARTIDOR en la tabla rol).',
       );
       return { asignados: 0, repartidores: 0, pedidosPendientes: 0, omitidosSinCupo: 0 };
     }
@@ -550,7 +496,7 @@ export class AsignacionRepartidoresService {
       return { asignados: 0, repartidores: repIds.length, pedidosPendientes: 0, omitidosSinCupo: 0 };
     }
 
-    const maxPorDia = this.maxEntregasPorRepartidorDia();
+    const maxPorDia = await this.maxEntregasPorRepartidorDia();
 
     const rowsCupo = (await this.dataSource.query(
       `select fk_usuario_repartidor::text as rep, to_char(fecha_entrega, 'YYYY-MM-DD') as dia, count(*)::int as c
