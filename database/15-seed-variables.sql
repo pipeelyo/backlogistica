@@ -110,6 +110,12 @@ INSERT INTO public.variable (clave, valor, tipo, descripcion) VALUES
     'Estado tras confirmar entrega exitosa o con novedades (5=Entregado).'
   ),
   (
+    'REPARTIDOR_PEDIDO_ESTADO_NO_ENTREGADO_ID',
+    '7',
+    'integer',
+    'Estado tras confirmar no entrega (7=No entregado); cierra factura en Por cobrar si no pagó.'
+  ),
+  (
     'ASIGNACION_GEOCODING_NOMINATIM',
     'false',
     'boolean',

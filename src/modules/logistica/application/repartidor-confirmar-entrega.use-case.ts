@@ -14,7 +14,9 @@ import { VariablesService } from '../../configuracion/variables.service';
 import {
   ESTADO_PEDIDO_ENTREGADO_ID,
   ESTADO_PEDIDO_EN_CURSO_ID,
+  ESTADO_PEDIDO_NO_ENTREGADO_ID,
 } from '../logistica-pedido-estados.constants';
+import { cerrarFacturaSiPedidoTerminal } from '../infrastructure/persistence/gestionar-factura-pedido';
 import { PEDIDO_READ } from '../pedidos.tokens';
 import { DescripcionSeguimientoOrmEntity } from '../infrastructure/persistence/descripcion-seguimiento.orm-entity';
 import { PedidoOrmEntity } from '../infrastructure/persistence/pedido.orm-entity';
@@ -47,6 +49,14 @@ export class RepartidorConfirmarEntregaUseCase {
     return this.variables.getInt(
       VAR.REPARTIDOR_PEDIDO_ESTADO_EN_CAMINO_ID,
       ESTADO_PEDIDO_EN_CURSO_ID,
+      { min: 1 },
+    );
+  }
+
+  private async idEstadoNoEntregado(): Promise<number> {
+    return this.variables.getInt(
+      VAR.REPARTIDOR_PEDIDO_ESTADO_NO_ENTREGADO_ID,
+      ESTADO_PEDIDO_NO_ENTREGADO_ID,
       { min: 1 },
     );
   }
@@ -159,6 +169,7 @@ export class RepartidorConfirmarEntregaUseCase {
 
     const idEnCurso = await this.idEstadoEnCurso();
     const idEntregado = await this.idEstadoEntregado();
+    const idNoEntregado = await this.idEstadoNoEntregado();
 
     const row = await this.pedidoRepo.findOne({
       where: { idPedido },
@@ -190,7 +201,12 @@ export class RepartidorConfirmarEntregaUseCase {
         : [];
 
     const pasaAEntregado = resultadoPasaAEntregado(resultado.codigo);
-    const idEstadoPaso = pasaAEntregado ? idEntregado : idEnCurso;
+    const sinEntrega = resultadoSinEntrega(resultado.codigo);
+    const idEstadoPaso = pasaAEntregado
+      ? idEntregado
+      : sinEntrega
+        ? idNoEntregado
+        : idEnCurso;
     const observaciones = body.observaciones.trim();
 
     await this.dataSource.transaction(async (manager) => {
@@ -258,6 +274,16 @@ export class RepartidorConfirmarEntregaUseCase {
           patchPedido.precio ?? null,
         ],
       );
+
+      const pedidoPost = await manager.getRepository(PedidoOrmEntity).findOne({
+        where: { idPedido },
+        relations: ['estadoPedido'],
+      });
+      if (pedidoPost) {
+        pedidoPost.pagadoPorRemitente = body.pagadoPorRemitente;
+        pedidoPost.valorRecaudado = body.valorRecaudado;
+        await cerrarFacturaSiPedidoTerminal(manager, pedidoPost);
+      }
     });
 
     const actualizado = await this.pedidos.findPedidoById(idPedido);

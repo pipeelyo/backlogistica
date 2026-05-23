@@ -22,8 +22,9 @@
 -- 13. 12-seed-tipo-documento.sql
 -- 14. 13-seed-tipo-pedido.sql
 -- 15. 14-seed-zona-bogota.sql
--- 16. 15-seed-variables.sql          (idempotente: ON CONFLICT actualiza descripciones)
--- 17. optional-factura.sql           (si usa facturación)
+-- 16. 16-seed-estados-factura.sql   (solo catálogo; BD nueva ya trae estado_factura en 01-schema)
+-- 17. 15-seed-variables.sql
+-- 18. factura-install.sql          (BD existente: CREATE factura + ALTER FK + estados)
 --
 -- Luego en la app:
 --   • Borrar usuario en Supabase Auth si re-registra el mismo correo

@@ -33,6 +33,9 @@ export class CreatePedidoUseCase {
       ...(body.observacionesManifiesto != null && {
         observacionesManifiesto: body.observacionesManifiesto,
       }),
+      pagadoPorRemitente: body.pagadoPorRemitente ?? false,
+      ...(body.idMetodoPago != null && { idMetodoPago: body.idMetodoPago }),
+      ...(body.precio != null && { precio: body.precio }),
       ...(body.fotosPaqueteUrls != null && { fotosPaqueteUrls: body.fotosPaqueteUrls }),
       ...(body.fotosPaqueteBase64 != null && { fotosPaqueteBase64: body.fotosPaqueteBase64 }),
     };

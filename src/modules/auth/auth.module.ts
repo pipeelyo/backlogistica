@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RepartidorRoleGuard } from './guards/repartidor-role.guard';
 import { SupervisorRoleGuard } from './guards/supervisor-role.guard';
+import { AdministradorRoleGuard } from './guards/administrador-role.guard';
 import { SupabaseJwtGuard } from './guards/supabase-jwt.guard';
 
 @Module({
@@ -17,7 +18,7 @@ import { SupabaseJwtGuard } from './guards/supabase-jwt.guard';
     TypeOrmModule.forFeature([UsuarioOrmEntity, UsuarioRolOrmEntity, RolOrmEntity, TipoDocumentoOrmEntity]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, SupabaseJwtGuard, RepartidorRoleGuard, SupervisorRoleGuard],
-  exports: [AuthService, SupabaseJwtGuard, RepartidorRoleGuard, SupervisorRoleGuard],
+  providers: [AuthService, SupabaseJwtGuard, RepartidorRoleGuard, SupervisorRoleGuard, AdministradorRoleGuard],
+  exports: [AuthService, SupabaseJwtGuard, RepartidorRoleGuard, SupervisorRoleGuard, AdministradorRoleGuard],
 })
 export class AuthModule {}

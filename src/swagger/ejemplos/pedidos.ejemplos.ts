@@ -32,6 +32,8 @@ export const EJEMPLO_CREAR_PEDIDO_DESPACHO_BOGOTA = {
   pesoKg: 2.5,
   valorDeclarado: 1500000,
   fragil: true,
+  pagadoPorRemitente: false,
+  precio: 18000,
   observacionesManifiesto:
     'Manipular con cuidado, llamar al recibir al número indicado en la etiqueta.',
   fotosPaqueteBase64: [EJEMPLO_FOTO_PAQUETE_DATA_URL],

@@ -8,6 +8,7 @@ import { ListPaisesUseCase } from '../../application/list-paises.use-case';
 import { ListRolesUseCase } from '../../application/list-roles.use-case';
 import { ListTiposDocumentoUseCase } from '../../application/list-tipos-documento.use-case';
 import { ListTiposPedidoUseCase } from '../../application/list-tipos-pedido.use-case';
+import { ListEstadosFacturaUseCase } from '../../application/list-estados-factura.use-case';
 import { ListMetodosPagoUseCase } from '../../application/list-metodos-pago.use-case';
 import { ListResultadosEntregaUseCase } from '../../application/list-resultados-entrega.use-case';
 import { ListTiposViaUseCase } from '../../application/list-tipos-via.use-case';
@@ -32,6 +33,7 @@ export class CatalogoController {
     private readonly listZonasBogota: ListZonasBogotaUseCase,
     private readonly listResultadosEntrega: ListResultadosEntregaUseCase,
     private readonly listMetodosPago: ListMetodosPagoUseCase,
+    private readonly listEstadosFactura: ListEstadosFacturaUseCase,
     private readonly listVariables: ListVariablesUseCase,
   ) {}
 
@@ -137,12 +139,24 @@ export class CatalogoController {
     return this.listResultadosEntrega.execute();
   }
 
+  @Get('estados-factura')
+  @ApiOperation({
+    summary: 'Estados de factura',
+    description:
+      'Valores para filtrar **GET /facturas** (`idEstadoFactura`). ' +
+      '1=Creada, 2=Pagada, 3=Por cobrar, 4=Saldo a favor.',
+  })
+  @ApiOkResponse({ type: CatalogoFilaSchema, isArray: true })
+  estadosFactura() {
+    return this.listEstadosFactura.execute();
+  }
+
   @Get('metodos-pago')
   @ApiOperation({
-    summary: 'Métodos de pago en destino (repartidor)',
+    summary: 'Métodos de pago',
     description:
-      'Catálogo **Efectivo / Transferencia / Datafono** para `idMetodoPago` en **POST /repartidor/pedidos/{id}/confirmar-entrega**. ' +
-      'Se guarda en `pedidos.fk_metodo_pago`. No confundir con `metodo_recepcion` del alta del pedido.',
+      'Catálogo para **`idMetodoPago`** en prepago (**POST /pedidos**, **POST /facturas/{id}/pagar**) ' +
+      'o cobro al entregar (**POST /repartidor/pedidos/{id}/confirmar-entrega**).',
   })
   @ApiOkResponse({ type: ResultadoEntregaCatalogoSchema, isArray: true })
   metodosPago() {

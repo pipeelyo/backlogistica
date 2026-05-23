@@ -1,0 +1,2 @@
+-- Alias de database/factura-install.sql (mismo contenido para migraciones numeradas).
+-- En Supabase: copie y ejecute database/factura-install.sql

@@ -12,6 +12,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import {
   CIUDAD_ID_BOGOTA_DC,
@@ -179,6 +180,39 @@ export class CreatePedidoBodyDto {
   @Type(() => Boolean)
   @IsBoolean()
   fragil!: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Opcional. true = prepago al crear el despacho; false u omitido = cobro al entregar. ' +
+      'La factura se crea igual en estado Creada; `monto_cobrado` queda en 0 hasta que haya cobro.',
+    example: false,
+    default: false,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  pagadoPorRemitente?: boolean;
+
+  @ApiPropertyOptional({
+    type: 'integer',
+    description: 'Requerido si `pagadoPorRemitente` = true. Ver **GET /catalogo/metodos-pago**.',
+  })
+  @ValidateIf((o: CreatePedidoBodyDto) => o.pagadoPorRemitente === true)
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  idMetodoPago?: number;
+
+  @ApiPropertyOptional({
+    description: 'Tarifa del envío (`pedidos.precio` y `factura.monto`). Si omites, usa `valorDeclarado`.',
+    example: 18000,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  precio?: number;
 
   @ApiPropertyOptional({
     description:

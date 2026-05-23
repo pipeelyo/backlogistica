@@ -32,6 +32,7 @@
 DROP TABLE IF EXISTS public.descripcion_seguimiento CASCADE;
 DROP TABLE IF EXISTS public.seguimiento CASCADE;
 DROP TABLE IF EXISTS public.factura CASCADE;
+DROP TABLE IF EXISTS public.estado_factura CASCADE;
 DROP TABLE IF EXISTS public.pedidos CASCADE;
 DROP TABLE IF EXISTS public.direccion CASCADE;
 DROP TABLE IF EXISTS public.usuario_rol CASCADE;

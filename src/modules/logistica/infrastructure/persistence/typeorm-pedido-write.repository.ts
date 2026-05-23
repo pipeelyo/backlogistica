@@ -28,6 +28,7 @@ import { DireccionOrmEntity } from './direccion.orm-entity';
 import { ZonaBogotaOrmEntity } from './zona-bogota.orm-entity';
 import { EstadoPedidoOrmEntity } from './estado-pedido.orm-entity';
 import { MetodoRecepcionOrmEntity } from './metodo-recepcion.orm-entity';
+import { MetodoPagoOrmEntity } from './metodo-pago.orm-entity';
 import { PaqueteOrmEntity } from './paquete.orm-entity';
 import { PedidoOrmEntity } from './pedido.orm-entity';
 import { RolOrmEntity } from './rol.orm-entity';
@@ -45,6 +46,10 @@ import {
   registrarSeguimientoCreacionPedido,
   registrarSeguimientoManifiestoActualizado,
 } from './registrar-seguimiento-pedido';
+import {
+  cerrarFacturaSiPedidoTerminal,
+  crearFacturaAlCrearPedido,
+} from './gestionar-factura-pedido';
 
 function generarNumGuia(): string {
   const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -386,6 +391,24 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
         this.logger.log(`TX[${txnLabel}] insert destinatario id_destinatario=${destinatario.idDestinatario}`);
 
         const monto = Number(input.valorDeclarado);
+        const precioEnvio = input.precio != null ? Number(input.precio) : monto;
+        const pagadoAlCrear = input.pagadoPorRemitente ?? false;
+        if (pagadoAlCrear && input.idMetodoPago == null) {
+          throw new BadRequestException(
+            'Indique idMetodoPago cuando pagadoPorRemitente es true. Ver GET /catalogo/metodos-pago.',
+          );
+        }
+        let metodoPagoCreacion: MetodoPagoOrmEntity | null = null;
+        if (pagadoAlCrear && input.idMetodoPago != null) {
+          metodoPagoCreacion = await manager.getRepository(MetodoPagoOrmEntity).findOne({
+            where: { idMetodoPago: input.idMetodoPago },
+          });
+          if (!metodoPagoCreacion) {
+            throw new BadRequestException(
+              `metodo_pago no encontrado: ${input.idMetodoPago}. Use GET /catalogo/metodos-pago.`,
+            );
+          }
+        }
         let fechaEntrega: Date;
         try {
           fechaEntrega = parseFechaEntregaYyyyMmDd(input.fechaEntrega);
@@ -406,10 +429,13 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
           paquete,
           direccion,
           estadoPedido: { idEstadoPedido: estado.idEstadoPedido },
-          precio: monto,
+          precio: precioEnvio,
           valorDeclarado: monto,
           fechaEntrega,
           fragil: input.fragil,
+          pagadoPorRemitente: pagadoAlCrear,
+          valorRecaudado: pagadoAlCrear ? precioEnvio : null,
+          metodoPago: metodoPagoCreacion,
           destinatario,
           fotosPaqueteUrls: null,
         });
@@ -462,6 +488,28 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
         this.logger.log(
           `TX[${txnLabel}] seguimiento creación id_pedido=${idPedido} manifiesto=${manifiestoTxt ? 'sí' : 'no'}`,
         );
+
+        const direccionEntregaTexto = [
+          ciudad.nombre,
+          departamento.nombre,
+          zona,
+          observacionesEntrega,
+        ]
+          .filter(Boolean)
+          .join(', ');
+
+        await crearFacturaAlCrearPedido(manager, {
+          idPedido,
+          idCliente: usuario.idUsuario,
+          monto: precioEnvio,
+          pagadoAlCrear,
+          idMetodoPago: metodoPagoCreacion?.idMetodoPago ?? null,
+          destinatarioNombre: destinatario.nombre,
+          destinatarioTelefono: destinatario.telefono,
+          direccionEntrega: direccionEntregaTexto,
+          idDestinatario: destinatario.idDestinatario,
+          idDireccion: direccion.idDireccion,
+        });
 
         const row = await pedidoRepo.findOne({
           where: { idPedido },
@@ -708,6 +756,14 @@ export class TypeOrmPedidoWriteRepository implements PedidoWritePort {
           idEstadoPedido: pedido.estadoPedido.idEstadoPedido,
           observacionesManifiesto: manifiestoPatch,
         });
+      }
+
+      const pedidoPostSave = await pedidoRepo.findOne({
+        where: { idPedido },
+        relations: ['estadoPedido'],
+      });
+      if (pedidoPostSave) {
+        await cerrarFacturaSiPedidoTerminal(manager, pedidoPostSave);
       }
     });
 

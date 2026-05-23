@@ -1,3 +1,5 @@
+import { EstadoFacturaOrmEntity } from './infrastructure/persistence/estado-factura.orm-entity';
+import { FacturaOrmEntity } from './infrastructure/persistence/factura.orm-entity';
 import { CiudadOrmEntity } from './infrastructure/persistence/ciudad.orm-entity';
 import { DepartamentoOrmEntity } from './infrastructure/persistence/departamento.orm-entity';
 import { DestinatarioOrmEntity } from './infrastructure/persistence/destinatario.orm-entity';
@@ -41,4 +43,6 @@ export const LOGISTICA_TYPEORM_ENTITIES = [
   DescripcionSeguimientoOrmEntity,
   ResultadoEntregaOrmEntity,
   MetodoPagoOrmEntity,
+  EstadoFacturaOrmEntity,
+  FacturaOrmEntity,
 ] as const;

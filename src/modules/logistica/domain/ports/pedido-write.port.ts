@@ -39,6 +39,12 @@ export type CreatePedidoFormInput = {
   pesoKg: number;
   valorDeclarado: number;
   fragil: boolean;
+  /** true = el remitente pagó al crear el despacho (prepago). */
+  pagadoPorRemitente?: boolean;
+  /** Requerido si `pagadoPorRemitente` = true. Catálogo `metodo_pago`. */
+  idMetodoPago?: number;
+  /** Tarifa del envío (`pedidos.precio` / `factura.monto`); default = `valorDeclarado`. */
+  precio?: number;
   observacionesManifiesto?: string;
   /** URLs `https` ya públicas (opcional). */
   fotosPaqueteUrls?: string[];

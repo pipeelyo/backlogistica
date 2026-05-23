@@ -8,7 +8,10 @@ import { ListMetodosRecepcionUseCase } from './application/list-metodos-recepcio
 import { ListPaisesUseCase } from './application/list-paises.use-case';
 import { GetPedidoByIdUseCase } from './application/get-pedido-by-id.use-case';
 import { GetPedidoByNumGuiaUseCase } from './application/get-pedido-by-num-guia.use-case';
-import { ListPedidosUseCase } from './application/list-pedidos.use-case';
+import { ListEstadosFacturaUseCase } from './application/list-estados-factura.use-case';
+import { ListFacturasUseCase } from './application/list-facturas.use-case';
+import { GetFacturaByIdUseCase } from './application/get-factura-by-id.use-case';
+import { PagarFacturaUseCase } from './application/pagar-factura.use-case';
 import { CreatePedidoUseCase } from './application/create-pedido.use-case';
 import { UpdatePedidoUseCase } from './application/update-pedido.use-case';
 import { AsignacionRepartidoresService } from './application/asignacion-repartidores.service';
@@ -24,7 +27,11 @@ import { TypeOrmPedidoReadRepository } from './infrastructure/persistence/typeor
 import { TypeOrmPedidoWriteRepository } from './infrastructure/persistence/typeorm-pedido-write.repository';
 import { SupabaseEvidenciasStorage } from './infrastructure/storage/supabase-evidencias.storage';
 import { LOGISTICA_TYPEORM_ENTITIES } from './logistica.persistence.entities';
+import { ListPedidosUseCase } from './application/list-pedidos.use-case';
 import { PEDIDO_READ, PEDIDO_WRITE } from './pedidos.tokens';
+import { TypeOrmFacturaReadRepository } from './infrastructure/persistence/typeorm-factura-read.repository';
+import { TypeOrmFacturaWriteRepository } from './infrastructure/persistence/typeorm-factura-write.repository';
+import { FACTURA_READ, FACTURA_WRITE } from './facturas.tokens';
 import { AsignacionRepartidoresCron } from './infrastructure/scheduling/asignacion-repartidores.cron';
 import { ListMetodosPagoUseCase } from './application/list-metodos-pago.use-case';
 import { ListResultadosEntregaUseCase } from './application/list-resultados-entrega.use-case';
@@ -32,19 +39,29 @@ import { ListPedidosRepartidorUseCase } from './application/list-pedidos-reparti
 import { RepartidorAceptarPedidoUseCase } from './application/repartidor-aceptar-pedido.use-case';
 import { RepartidorRecibirPedidoUseCase } from './application/repartidor-recibir-pedido.use-case';
 import { RepartidorConfirmarEntregaUseCase } from './application/repartidor-confirmar-entrega.use-case';
+import { FacturasController } from './presentation/http/facturas.controller';
 import { CatalogoController } from './presentation/http/catalogo.controller';
 import { PedidosController } from './presentation/http/pedidos.controller';
 import { RepartidorPedidosController } from './presentation/http/repartidor-pedidos.controller';
 import { SupervisorPedidosController } from './presentation/http/supervisor-pedidos.controller';
 import { ListPedidosEnRepartoSupervisorUseCase } from './application/list-pedidos-en-reparto-supervisor.use-case';
 import { SupervisorUpdatePedidoUseCase } from './application/supervisor-update-pedido.use-case';
+import {
+  GetIngresosTotalesUseCase,
+  GetPagoPersonalUseCase,
+  GetUtilidadBrutaUseCase,
+  ListTransaccionesRecientesUseCase,
+} from './application/finanzas-kpi.use-cases';
+import { TypeOrmFinanzasKpiRepository } from './infrastructure/persistence/typeorm-finanzas-kpi.repository';
+import { FINANZAS_KPI } from './finanzas.tokens';
+import { AdminFinanzasController } from './presentation/http/admin-finanzas.controller';
 
 /**
  * Bounded context logística: catálogos, lectura de pedidos y mapa ORM.
  */
 @Module({
   imports: [AuthModule, TypeOrmModule.forFeature([...LOGISTICA_TYPEORM_ENTITIES])],
-  controllers: [CatalogoController, PedidosController, RepartidorPedidosController, SupervisorPedidosController],
+  controllers: [CatalogoController, PedidosController, FacturasController, AdminFinanzasController, RepartidorPedidosController, SupervisorPedidosController],
   providers: [
     TypeOrmCatalogReadRepository,
     { provide: CATALOG_READ, useExisting: TypeOrmCatalogReadRepository },
@@ -53,6 +70,12 @@ import { SupervisorUpdatePedidoUseCase } from './application/supervisor-update-p
     SupabaseEvidenciasStorage,
     TypeOrmPedidoWriteRepository,
     { provide: PEDIDO_WRITE, useExisting: TypeOrmPedidoWriteRepository },
+    TypeOrmFacturaReadRepository,
+    { provide: FACTURA_READ, useExisting: TypeOrmFacturaReadRepository },
+    TypeOrmFacturaWriteRepository,
+    { provide: FACTURA_WRITE, useExisting: TypeOrmFacturaWriteRepository },
+    TypeOrmFinanzasKpiRepository,
+    { provide: FINANZAS_KPI, useExisting: TypeOrmFinanzasKpiRepository },
     ListPaisesUseCase,
     ListDepartamentosUseCase,
     ListCiudadesUseCase,
@@ -65,6 +88,10 @@ import { SupervisorUpdatePedidoUseCase } from './application/supervisor-update-p
     ListZonasBogotaUseCase,
     ListVariablesUseCase,
     ListPedidosUseCase,
+    ListFacturasUseCase,
+    GetFacturaByIdUseCase,
+    PagarFacturaUseCase,
+    ListEstadosFacturaUseCase,
     GetPedidoByIdUseCase,
     GetPedidoByNumGuiaUseCase,
     CreatePedidoUseCase,
@@ -77,6 +104,10 @@ import { SupervisorUpdatePedidoUseCase } from './application/supervisor-update-p
     RepartidorConfirmarEntregaUseCase,
     ListPedidosEnRepartoSupervisorUseCase,
     SupervisorUpdatePedidoUseCase,
+    GetIngresosTotalesUseCase,
+    GetPagoPersonalUseCase,
+    GetUtilidadBrutaUseCase,
+    ListTransaccionesRecientesUseCase,
     AsignacionRepartidoresService,
     AsignacionRepartidoresCron,
   ],
