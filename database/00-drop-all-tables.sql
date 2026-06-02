@@ -29,6 +29,8 @@
 -- RESTART IDENTITY CASCADE;
 
 -- Opción B: DROP (recomendado antes de recrear con IDs numéricos)
+DROP TABLE IF EXISTS public.dispersion_detalle CASCADE;
+DROP TABLE IF EXISTS public.dispersion_lote CASCADE;
 DROP TABLE IF EXISTS public.descripcion_seguimiento CASCADE;
 DROP TABLE IF EXISTS public.seguimiento CASCADE;
 DROP TABLE IF EXISTS public.factura CASCADE;

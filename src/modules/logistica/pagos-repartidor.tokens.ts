@@ -1,0 +1,1 @@
+export const PAGOS_REPARTIDOR = Symbol('PAGOS_REPARTIDOR');

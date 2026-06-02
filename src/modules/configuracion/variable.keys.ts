@@ -32,6 +32,8 @@ export const VAR = {
   FINANZAS_TARIFA_PAGO_REPARTIDOR_ENTREGA: 'FINANZAS_TARIFA_PAGO_REPARTIDOR_ENTREGA',
   /** Nómina fija mensual (supervisión/admin); se prorratea por días del periodo KPI. */
   FINANZAS_PAGO_PERSONAL_FIJO_MENSUAL: 'FINANZAS_PAGO_PERSONAL_FIJO_MENSUAL',
+  /** Meta de entregas diarias (KPI dashboard Pago a Repartidores). */
+  FINANZAS_META_ENTREGAS_DIARIA: 'FINANZAS_META_ENTREGAS_DIARIA',
 } as const;
 
 export type VariableKey = (typeof VAR)[keyof typeof VAR];

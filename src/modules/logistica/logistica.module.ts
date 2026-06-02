@@ -54,14 +54,29 @@ import {
 } from './application/finanzas-kpi.use-cases';
 import { TypeOrmFinanzasKpiRepository } from './infrastructure/persistence/typeorm-finanzas-kpi.repository';
 import { FINANZAS_KPI } from './finanzas.tokens';
+import { AdminPagosRepartidoresController } from './presentation/http/admin-pagos-repartidores.controller';
 import { AdminFinanzasController } from './presentation/http/admin-finanzas.controller';
+import { AdminUsuariosController } from './presentation/http/admin-usuarios.controller';
+import { TypeOrmUsuarioAdminRepository } from './infrastructure/persistence/typeorm-usuario-admin.repository';
+import { USUARIO_ADMIN } from './usuarios-admin.tokens';
+import {
+  ActualizarRolesUsuarioUseCase,
+  ListUsuariosAdminUseCase,
+} from './application/usuarios-admin.use-cases';
+import { TypeOrmPagosRepartidorRepository } from './infrastructure/persistence/typeorm-pagos-repartidor.repository';
+import { PAGOS_REPARTIDOR } from './pagos-repartidor.tokens';
+import {
+  GenerarDispersionRepartidorUseCase,
+  GetPagosRepartidorKpisUseCase,
+  ListRepartidoresPagoUseCase,
+} from './application/pagos-repartidor.use-cases';
 
 /**
  * Bounded context logística: catálogos, lectura de pedidos y mapa ORM.
  */
 @Module({
   imports: [AuthModule, TypeOrmModule.forFeature([...LOGISTICA_TYPEORM_ENTITIES])],
-  controllers: [CatalogoController, PedidosController, FacturasController, AdminFinanzasController, RepartidorPedidosController, SupervisorPedidosController],
+  controllers: [CatalogoController, PedidosController, FacturasController, AdminFinanzasController, AdminPagosRepartidoresController, AdminUsuariosController, RepartidorPedidosController, SupervisorPedidosController],
   providers: [
     TypeOrmCatalogReadRepository,
     { provide: CATALOG_READ, useExisting: TypeOrmCatalogReadRepository },
@@ -76,6 +91,10 @@ import { AdminFinanzasController } from './presentation/http/admin-finanzas.cont
     { provide: FACTURA_WRITE, useExisting: TypeOrmFacturaWriteRepository },
     TypeOrmFinanzasKpiRepository,
     { provide: FINANZAS_KPI, useExisting: TypeOrmFinanzasKpiRepository },
+    TypeOrmPagosRepartidorRepository,
+    { provide: PAGOS_REPARTIDOR, useExisting: TypeOrmPagosRepartidorRepository },
+    TypeOrmUsuarioAdminRepository,
+    { provide: USUARIO_ADMIN, useExisting: TypeOrmUsuarioAdminRepository },
     ListPaisesUseCase,
     ListDepartamentosUseCase,
     ListCiudadesUseCase,
@@ -108,6 +127,11 @@ import { AdminFinanzasController } from './presentation/http/admin-finanzas.cont
     GetPagoPersonalUseCase,
     GetUtilidadBrutaUseCase,
     ListTransaccionesRecientesUseCase,
+    GetPagosRepartidorKpisUseCase,
+    ListRepartidoresPagoUseCase,
+    GenerarDispersionRepartidorUseCase,
+    ListUsuariosAdminUseCase,
+    ActualizarRolesUsuarioUseCase,
     AsignacionRepartidoresService,
     AsignacionRepartidoresCron,
   ],
