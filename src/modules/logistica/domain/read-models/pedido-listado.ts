@@ -36,4 +36,5 @@ export interface PedidoListado {
   fotosPaqueteUrls: string[] | null;
   pagadoPorRemitente: boolean;
   precio: number;
+  observacionesEntrega: string | null;
 }

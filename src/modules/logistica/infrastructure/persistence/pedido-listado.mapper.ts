@@ -60,5 +60,6 @@ export function pedidoOrmToListado(row: PedidoOrmEntity): PedidoListado {
     fotosPaqueteUrls: row.fotosPaqueteUrls ?? null,
     pagadoPorRemitente: row.pagadoPorRemitente ?? false,
     precio: row.precio ?? 0,
+    observacionesEntrega: null,
   };
 }
